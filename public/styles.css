@@ -1012,3 +1012,42 @@ select:focus {
 .editor-preview[data-theme="forge-dracula"] { background: #282a36; color: #f8f8f2; }
 .editor-preview[data-theme="forge-ocean"] { background: #08111f; color: #dbeafe; }
 .editor-preview[data-theme="forge-mono"] { background: #101010; color: #e7e7e7; }
+
+
+.download-app-button,
+.desktop-update-badge {
+	height: 30px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 12px;
+	border: 1px solid var(--border-strong);
+	border-radius: 10px;
+	background: #202020;
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 700;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: background 0.14s ease, border-color 0.14s ease, transform 0.12s ease;
+}
+
+.download-app-button:hover,
+.desktop-update-badge:hover {
+	background: #2a2a2a;
+	border-color: #555;
+	transform: translateY(-1px);
+}
+
+.desktop-update-badge {
+	max-width: 190px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@media (max-width: 980px) {
+	.download-app-button,
+	.desktop-update-badge {
+		display: none;
+	}
+}

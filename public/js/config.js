@@ -48,3 +48,5 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const FILES_POLL_INTERVAL = 3600;
+
+export const APP_DOWNLOAD_URL = "https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.exe";

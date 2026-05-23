@@ -1,11 +1,41 @@
 const http = require("http");
 const { handleRequest } = require("./src/server/router");
 
-const PORT = process.env.PORT || 3000;
+const DEFAULT_PORT = Number(process.env.PORT || 3000);
 
-const server = http.createServer(handleRequest);
+function startServer(options = {}) {
+	const port = Number(options.port || DEFAULT_PORT);
+	const host = options.host || "0.0.0.0";
+	const server = http.createServer(handleRequest);
 
-server.listen(PORT, "0.0.0.0", () => {
-	console.log("[Forge API] Running on port " + PORT);
-	console.log("[Forge UI] http://localhost:" + PORT);
-});
+	return new Promise((resolve, reject) => {
+		let settled = false;
+
+		server.once("error", error => {
+			if (settled) return;
+			settled = true;
+			reject(error);
+		});
+
+		server.listen(port, host, () => {
+			if (settled) return;
+			settled = true;
+			const address = server.address();
+			resolve({ server, port: address && address.port ? address.port : port, host });
+		});
+	});
+}
+
+if (require.main === module) {
+	startServer({ port: DEFAULT_PORT, host: "0.0.0.0" })
+		.then(({ port }) => {
+			console.log("[Forge API] Running on port " + port);
+			console.log("[Forge UI] http://localhost:" + port);
+		})
+		.catch(error => {
+			console.error("[Forge API] Failed to start:", error.message || error);
+			process.exitCode = 1;
+		});
+}
+
+module.exports = { startServer };

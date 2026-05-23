@@ -1,11 +1,85 @@
 {
-	"name": "forge-editor-server",
-	"version": "2.2.0",
-	"description": "Private Forge editor server with a professional dark web UI.",
+	"name": "forge-editor",
+	"version": "1.0.0",
+	"description": "Forge - professional Roblox script compiler and private desktop editor.",
 	"private": true,
-	"main": "server.js",
+	"main": "electron/main.js",
+	"author": "27sBurguer",
+	"license": "UNLICENSED",
 	"scripts": {
-		"start": "node server.js"
+		"start": "node server.js",
+		"desktop": "electron .",
+		"dev:app": "electron .",
+		"build:win": "electron-builder --win nsis",
+		"build:app": "electron-builder",
+		"release": "electron-builder --publish always"
 	},
-	"dependencies": {}
+	"dependencies": {
+		"electron-updater": "^6.3.9"
+	},
+	"devDependencies": {
+		"electron": "^39.0.0",
+		"electron-builder": "^26.0.12"
+	},
+	"build": {
+		"appId": "com.forge.editor",
+		"productName": "Forge",
+		"asar": true,
+		"directories": {
+			"output": "dist"
+		},
+		"files": [
+			"electron/**/*",
+			"public/**/*",
+			"src/**/*",
+			"server.js",
+			"package.json"
+		],
+		"publish": [
+			{
+				"provider": "github",
+				"owner": "27sBurguer",
+				"repo": "forge-editor",
+				"releaseType": "release"
+			}
+		],
+		"win": {
+			"target": [
+				{
+					"target": "nsis",
+					"arch": [
+						"x64"
+					]
+				}
+			],
+			"artifactName": "Forge-Setup.${ext}"
+		},
+		"nsis": {
+			"oneClick": false,
+			"perMachine": false,
+			"allowElevation": true,
+			"allowToChangeInstallationDirectory": true,
+			"createDesktopShortcut": true,
+			"createStartMenuShortcut": true,
+			"shortcutName": "Forge"
+		},
+		"mac": {
+			"target": [
+				"dmg"
+			],
+			"category": "public.app-category.developer-tools"
+		},
+		"linux": {
+			"target": [
+				"AppImage",
+				"deb"
+			],
+			"category": "Development"
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/27sBurguer/forge-editor.git"
+	},
+	"homepage": "https://github.com/27sBurguer/forge-editor#readme"
 }
