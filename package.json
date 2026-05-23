@@ -7,19 +7,18 @@
 	"author": "27sBurguer",
 	"license": "UNLICENSED",
 	"scripts": {
-		"start": "node server.js",
-		"desktop": "electron .",
-		"dev:app": "electron .",
-		"build:win": "electron-builder --win nsis",
-		"build:app": "electron-builder",
-		"release": "electron-builder --publish always"
-	},
-	"dependencies": {
-		"electron-updater": "^6.3.9"
+	"start": "node server.js",
+	"desktop": "electron .",
+	"build:win": "electron-builder --win",
+	"release": "electron-builder --win --publish always",
+	"release:win": "electron-builder --win --publish always"
 	},
 	"devDependencies": {
-		"electron": "^39.0.0",
-		"electron-builder": "^26.0.12"
+	"electron": "^31.0.0",
+	"electron-builder": "^24.13.3"
+	},
+	"dependencies": {
+	"electron-updater": "^6.2.1"
 	},
 	"build": {
 		"appId": "com.forge.editor",
