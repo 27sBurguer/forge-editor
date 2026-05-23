@@ -5,6 +5,7 @@ const { startServer } = require("../server");
 
 const APP_PORT = Number(process.env.FORGE_PORT || 3000);
 const APP_HOST = "127.0.0.1";
+const APP_ICON_PATH = path.join(__dirname, "..", "public", "assets", "forge-icon.png");
 
 let mainWindow = null;
 let serverHandle = null;
@@ -73,6 +74,7 @@ async function createWindow() {
 		show: false,
 		backgroundColor: "#0f0f0f",
 		title: "Forge",
+		icon: APP_ICON_PATH,
 		autoHideMenuBar: true,
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
@@ -170,6 +172,8 @@ ipcMain.handle("forge:check-for-updates", async () => {
 		return { ok: false, error: error && error.message ? error.message : String(error) };
 	}
 });
+
+app.setAppUserModelId("com.forge.editor");
 
 app.whenReady().then(boot);
 

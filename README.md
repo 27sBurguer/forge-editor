@@ -91,3 +91,43 @@ O app instalado detecta a atualização e baixa automaticamente.
 A pasta `plugin/` inclui `ForgePlugin.txt`, a versão segura sem roots runtime como `Players` e `NetworkClient`.
 
 Essa versão pausa durante Play Mode para evitar conflitos enquanto o jogo está rodando.
+
+
+## Desktop release notes
+
+This package is already configured for:
+
+- GitHub owner: `27sBurguer`
+- Repository: `forge-editor`
+- Windows installer artifact: `Forge-Setup.exe`
+- App icon: `public/assets/forge-icon.ico`
+- Auto-update through GitHub Releases
+
+The release workflow intentionally does not use npm cache, so it does not require `package-lock.json`.
+
+To publish a new Windows installer:
+
+```bash
+git add .
+git commit -m "Update Forge desktop build"
+git push origin main
+
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+If the tag already exists from a failed run:
+
+```bash
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+After the Action finishes, the download button points to:
+
+```txt
+https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.exe
+```

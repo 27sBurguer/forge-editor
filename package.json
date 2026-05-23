@@ -7,18 +7,20 @@
 	"author": "27sBurguer",
 	"license": "UNLICENSED",
 	"scripts": {
-	"start": "node server.js",
-	"desktop": "electron .",
-	"build:win": "electron-builder --win",
-	"release": "electron-builder --win --publish always",
-	"release:win": "electron-builder --win --publish always"
-	},
-	"devDependencies": {
-	"electron": "^31.0.0",
-	"electron-builder": "^24.13.3"
+		"start": "node server.js",
+		"desktop": "electron .",
+		"dev:app": "electron .",
+		"build:win": "electron-builder --win nsis",
+		"build:app": "electron-builder",
+		"release": "electron-builder --publish always",
+		"release:win": "electron-builder --win nsis --publish always"
 	},
 	"dependencies": {
-	"electron-updater": "^6.2.1"
+		"electron-updater": "^6.3.9"
+	},
+	"devDependencies": {
+		"electron": "^39.0.0",
+		"electron-builder": "^26.0.12"
 	},
 	"build": {
 		"appId": "com.forge.editor",
@@ -32,7 +34,10 @@
 			"public/**/*",
 			"src/**/*",
 			"server.js",
-			"package.json"
+			"package.json",
+			"public/assets/forge-icon.ico",
+			"public/assets/forge-icon.png",
+			"public/assets/forge-logo.png"
 		],
 		"publish": [
 			{
@@ -51,7 +56,8 @@
 					]
 				}
 			],
-			"artifactName": "Forge-Setup.${ext}"
+			"artifactName": "Forge-Setup.${ext}",
+			"icon": "public/assets/forge-icon.ico"
 		},
 		"nsis": {
 			"oneClick": false,
@@ -60,7 +66,10 @@
 			"allowToChangeInstallationDirectory": true,
 			"createDesktopShortcut": true,
 			"createStartMenuShortcut": true,
-			"shortcutName": "Forge"
+			"shortcutName": "Forge",
+			"installerIcon": "public/assets/forge-icon.ico",
+			"uninstallerIcon": "public/assets/forge-icon.ico",
+			"installerHeaderIcon": "public/assets/forge-icon.ico"
 		},
 		"mac": {
 			"target": [
