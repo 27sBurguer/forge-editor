@@ -7,13 +7,11 @@
 	"author": "27sBurguer",
 	"license": "UNLICENSED",
 	"scripts": {
-		"start": "node server.js",
-		"desktop": "electron .",
-		"dev:app": "electron .",
-		"build:win": "electron-builder --win nsis",
-		"build:app": "electron-builder",
-		"release": "electron-builder --publish always",
-		"release:win": "electron-builder --win nsis --publish always"
+	"start": "node server.js",
+	"desktop": "electron .",
+	"build:win": "electron-builder --win nsis --publish never",
+	"release": "electron-builder --win nsis --publish always",
+	"release:win": "electron-builder --win nsis --publish always"
 	},
 	"dependencies": {
 		"electron-updater": "^6.3.9"
