@@ -639,6 +639,20 @@ function getHomeHtml() {
 			flex: 1;
 		}
 
+		.node-rename-input {
+			min-width: 0;
+			flex: 1;
+			height: 22px;
+			border: 1px solid var(--blue);
+			background: #111111;
+			color: var(--text);
+			border-radius: 7px;
+			padding: 0 7px;
+			font-size: 12px;
+			outline: none;
+			box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.22);
+		}
+
 		.node-actions {
 			display: none;
 			align-items: center;
@@ -1252,7 +1266,7 @@ function getHomeHtml() {
 
 		<footer class="footer">
 			<span id="footerLeft">Ready</span>
-			<span id="footerRight">Ctrl+S: save · Ctrl+W / middle click: close · Delete: remove selected</span>
+			<span id="footerRight">Ctrl+S: save · Ctrl+W / middle click: close · F2: rename · Delete: remove selected</span>
 		</footer>
 	</div>
 
@@ -1403,6 +1417,7 @@ function getHomeHtml() {
 		let applyingEditorValue = false;
 		let draggingItemId = "";
 		let draggingTabId = "";
+		let renamingItemId = "";
 		let pendingCreateParent = null;
 		let selectedCreateClass = "Script";
 		let confirmResolver = null;
@@ -1435,6 +1450,13 @@ function getHomeHtml() {
 				.replace(/>/g, "&gt;")
 				.replace(/"/g, "&quot;")
 				.replace(/'/g, "&#039;");
+		}
+
+		function sanitizeClientName(value) {
+			return String(value || "")
+				.trim()
+				.replace(/[\\/\0]/g, "-")
+				.slice(0, 80);
 		}
 
 		function clamp(number, min, max) {
@@ -1779,9 +1801,54 @@ function getHomeHtml() {
 			icon.className = "node-icon " + iconData.cls;
 			icon.textContent = iconData.icon;
 
-			const name = document.createElement("span");
-			name.className = "node-name";
-			name.textContent = node.name;
+			let name = null;
+
+			if (node.item && renamingItemId === node.item.fileId) {
+				name = document.createElement("input");
+				name.className = "node-rename-input";
+				name.value = node.name;
+				name.spellcheck = false;
+				let renameFinished = false;
+
+				function finishRename(shouldCommit) {
+					if (renameFinished) return;
+					renameFinished = true;
+
+					if (shouldCommit) {
+						renameItem(node.item.fileId, name.value);
+					} else {
+						renamingItemId = "";
+						renderTree();
+					}
+				}
+
+				name.addEventListener("click", function(event) { event.stopPropagation(); });
+				name.addEventListener("dblclick", function(event) { event.stopPropagation(); });
+				name.addEventListener("mousedown", function(event) { event.stopPropagation(); });
+				name.addEventListener("keydown", function(event) {
+					event.stopPropagation();
+
+					if (event.key === "Enter") {
+						event.preventDefault();
+						finishRename(true);
+					}
+
+					if (event.key === "Escape") {
+						event.preventDefault();
+						finishRename(false);
+					}
+				});
+				name.addEventListener("blur", function() { finishRename(true); });
+
+				setTimeout(function() {
+					name.focus();
+					name.select();
+				}, 20);
+			} else {
+				name = document.createElement("span");
+				name.className = "node-name";
+				name.textContent = node.name;
+			}
 
 			const actions = document.createElement("span");
 			actions.className = "node-actions";
@@ -1814,12 +1881,14 @@ function getHomeHtml() {
 			row.appendChild(actions);
 
 			row.addEventListener("click", function() {
+				if (node.item && renamingItemId === node.item.fileId) return;
 				setSelectedNode(node);
 				if (node.item && isScriptItem(node.item)) openFile(node.item);
 			});
 
 			row.addEventListener("dblclick", function(event) {
 				event.stopPropagation();
+				if (node.item && renamingItemId === node.item.fileId) return;
 				if (hasChildren) {
 					if (expandedKeys.has(node.key)) expandedKeys.delete(node.key);
 					else expandedKeys.add(node.key);
@@ -2365,6 +2434,97 @@ function getHomeHtml() {
 			} catch (error) {
 				showToast(error.message, "error");
 				setStatus(error.message, "error");
+			}
+		}
+
+		function getRenameTarget() {
+			if (selectedPayload && selectedPayload.itemId) {
+				return getLoadedFile(selectedPayload.itemId);
+			}
+
+			if (currentFileId) {
+				return getLoadedFile(currentFileId);
+			}
+
+			return null;
+		}
+
+		function startRenameSelected() {
+			const item = getRenameTarget();
+
+			if (!item) {
+				showToast("Select a script or folder to rename.", "warning");
+				return;
+			}
+
+			if (!item.fileId || !item.root || !item.relativePath) {
+				showToast("This item cannot be renamed.", "warning");
+				return;
+			}
+
+			renamingItemId = item.fileId;
+			selectedKey = "item:" + item.fileId;
+			selectedPayload = {
+				root: item.root,
+				relativePath: item.relativePath,
+				itemId: item.fileId,
+				label: item.root + "/" + item.relativePath,
+			};
+
+			renderTree();
+		}
+
+		async function renameItem(fileId, rawName) {
+			const item = getLoadedFile(fileId);
+			const newName = sanitizeClientName(rawName);
+
+			renamingItemId = "";
+
+			if (!item) {
+				showToast("Item no longer exists.", "warning");
+				renderTree();
+				return;
+			}
+
+			if (!newName) {
+				showToast("Name is required.", "warning");
+				renderTree();
+				return;
+			}
+
+			if (newName === item.name) {
+				renderTree();
+				return;
+			}
+
+			try {
+				const response = await fetch("/sessions/" + encodeURIComponent(currentSessionId) + "/files/" + encodeURIComponent(fileId) + "/move", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						root: item.root,
+						parentRelativePath: item.parentRelativePath || getParentPath(item.relativePath),
+						parentItemId: item.parentItemId || "",
+						name: newName,
+					}),
+				});
+
+				const data = await response.json();
+				if (!response.ok || !data.ok) throw new Error(data.error || "Failed to rename item.");
+
+				await fetchSessionFiles(false);
+				const renamed = data.item || getLoadedFile(fileId);
+
+				if (renamed && renamed.fileId) {
+					selectedKey = "item:" + renamed.fileId;
+					selectedPayload = { root: renamed.root, relativePath: renamed.relativePath, itemId: renamed.fileId, label: renamed.root + "/" + renamed.relativePath };
+				}
+
+				showToast("Renamed to " + newName + ".", "success");
+			} catch (error) {
+				showToast(error.message, "error");
+				setStatus(error.message, "error");
+				renderTree();
 			}
 		}
 
@@ -2987,6 +3147,11 @@ function getHomeHtml() {
 				if ((event.ctrlKey || event.metaKey) && key === "i") {
 					event.preventDefault();
 					openCreatePanel(getBestCreationParent(), "Script");
+				}
+
+				if (event.key === "F2" && !isInputLike(event.target)) {
+					event.preventDefault();
+					startRenameSelected();
 				}
 
 				if (event.key === "Delete" && !isInputLike(event.target) && getDeleteTarget()) {
