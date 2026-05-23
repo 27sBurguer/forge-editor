@@ -139,6 +139,9 @@ const state = {
 	editor: null,
 	lastConnectionErrorAt: 0,
 	projectSearchCache: new Map(),
+	hasInitializedRootExpansion: false,
+	isRestoringWorkspace: false,
+	renameStartedAt: 0,
 };
 
 function getAuth() {
@@ -150,6 +153,31 @@ function getAuth() {
 
 function hasConnection() {
 	return !!state.sessionId && !!state.secret;
+}
+
+function getWorkspaceStorageKey() {
+	const sessionId = String(state.sessionId || "").trim();
+	return sessionId ? STORAGE.workspace + ":" + sessionId : STORAGE.workspace;
+}
+
+function saveWorkspaceState() {
+	if (!hasConnection() || state.isRestoringWorkspace) return;
+
+	const payload = {
+		tabIds: Array.from(state.openTabs.keys()),
+		currentFileId: state.currentFileId || "",
+		secondaryFileId: state.secondaryFileId || "",
+		activeGroup: state.activeGroup || "primary",
+		savedAt: Date.now(),
+	};
+
+	saveJson(getWorkspaceStorageKey(), payload);
+}
+
+function clearWorkspaceState() {
+	try {
+		localStorage.removeItem(getWorkspaceStorageKey());
+	} catch (error) {}
 }
 
 function updateConnectionUi(connected, label) {
@@ -253,8 +281,13 @@ function buildTree() {
 		}
 	}
 
-	for (const rootNode of root.children.values()) {
-		state.expandedKeys.add(rootNode.key);
+	if (!state.hasInitializedRootExpansion && !localStorage.getItem(STORAGE.expanded)) {
+		for (const rootNode of root.children.values()) {
+			if (rootNode.children.size > 0) {
+				state.expandedKeys.add(rootNode.key);
+			}
+		}
+		state.hasInitializedRootExpansion = true;
 	}
 
 	state.treeRoot = root;
@@ -401,6 +434,84 @@ function renderTree() {
 	updateEditorHeader();
 }
 
+function getActiveEditorGroup() {
+	return state.activeGroup === "secondary" && state.secondaryFileId ? "secondary" : "primary";
+}
+
+function getClosableFileId(group = getActiveEditorGroup()) {
+	return getActiveFileId(group) || state.currentFileId || Array.from(state.openTabs.keys()).pop() || "";
+}
+
+function foldActiveScript() {
+	state.editor?.foldAll?.(getActiveEditorGroup());
+	setStatus("Current script folded.", "success");
+}
+
+function unfoldActiveScript() {
+	state.editor?.unfoldAll?.(getActiveEditorGroup());
+	setStatus("Current script unfolded.", "success");
+}
+
+function collapseExplorer() {
+	refs.searchInput.value = "";
+	state.expandedKeys.clear();
+	saveJson(STORAGE.expanded, []);
+	renderTree();
+	setStatus("Explorer collapsed.", "success");
+}
+
+function expandExplorer() {
+	refs.searchInput.value = "";
+	buildTree();
+	const keys = [];
+	function walk(node) {
+		if (!node || node.children.size === 0) return;
+		keys.push(node.key);
+		for (const child of node.children.values()) walk(child);
+	}
+	for (const rootNode of state.treeRoot.children.values()) walk(rootNode);
+	state.expandedKeys = new Set(keys);
+	saveJson(STORAGE.expanded, keys);
+	renderTree();
+	setStatus("Explorer expanded.", "success");
+}
+
+function handleGlobalShortcut(event) {
+	const key = String(event.key || "").toLowerCase();
+	const code = event.code || "";
+	const mod = event.ctrlKey || event.metaKey;
+
+	if (!mod) return false;
+
+	if (key === "w" || code === "KeyW") {
+		const fileId = getClosableFileId();
+		if (!fileId) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+		closeTab(fileId);
+		return true;
+	}
+
+	if (event.shiftKey && (key === "e" || code === "KeyE")) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+		foldActiveScript();
+		return true;
+	}
+
+	if (!event.shiftKey && (key === "e" || code === "KeyE")) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+		unfoldActiveScript();
+		return true;
+	}
+
+	return false;
+}
+
 function makeIconButton(className, iconName, title) {
 	const button = document.createElement("button");
 	button.className = className;
@@ -449,6 +560,7 @@ function renderNode(parent, node, depth, query) {
 		nameEl.className = "node-rename-input";
 		nameEl.value = node.name;
 		nameEl.spellcheck = false;
+		nameEl.dataset.renameItemId = node.item.fileId;
 
 		let renameFinished = false;
 
@@ -460,11 +572,13 @@ function renderNode(parent, node, depth, query) {
 				renameItem(node.item.fileId, nameEl.value);
 			} else {
 				state.renamingItemId = "";
+				state.renameStartedAt = 0;
 				renderTree();
 			}
 		}
 
 		nameEl.addEventListener("click", event => event.stopPropagation());
+		nameEl.addEventListener("dblclick", event => event.stopPropagation());
 		nameEl.addEventListener("mousedown", event => event.stopPropagation());
 		nameEl.addEventListener("keydown", event => {
 			event.stopPropagation();
@@ -479,12 +593,25 @@ function renderNode(parent, node, depth, query) {
 				finishRename(false);
 			}
 		});
-		nameEl.addEventListener("blur", () => finishRename(true));
+		nameEl.addEventListener("blur", () => {
+			setTimeout(() => {
+				if (renameFinished || state.renamingItemId !== node.item.fileId) return;
+
+				if (Date.now() - state.renameStartedAt < 220) {
+					nameEl.focus();
+					nameEl.select();
+					return;
+				}
+
+				finishRename(true);
+			}, 120);
+		});
 
 		setTimeout(() => {
+			if (state.renamingItemId !== node.item.fileId) return;
 			nameEl.focus();
 			nameEl.select();
-		}, 20);
+		}, 40);
 	} else {
 		nameEl = document.createElement("span");
 		nameEl.className = "node-name";
@@ -621,6 +748,7 @@ function reorderTab(sourceId, targetId, placeAfter) {
 	}
 
 	renderTabs();
+	saveWorkspaceState();
 }
 
 function renderTabs() {
@@ -741,6 +869,7 @@ function switchTab(fileId, group = "primary") {
 	renderTree();
 	updateEditorHeader();
 	state.editor.focus(state.activeGroup);
+	saveWorkspaceState();
 }
 
 function splitTab(fileId = state.currentFileId) {
@@ -757,6 +886,7 @@ function splitTab(fileId = state.currentFileId) {
 	renderTabs();
 	updateEditorHeader();
 	state.editor.focus("secondary");
+	saveWorkspaceState();
 }
 
 function closeSplit() {
@@ -766,6 +896,7 @@ function closeSplit() {
 	renderTabs();
 	updateEditorHeader();
 	state.editor.focus("primary");
+	saveWorkspaceState();
 }
 
 async function openFile(file) {
@@ -837,6 +968,7 @@ async function closeTab(fileId, force = false) {
 
 	renderTabs();
 	updateEditorHeader();
+	saveWorkspaceState();
 }
 
 function markCurrentDirty(group = state.activeGroup) {
@@ -962,9 +1094,18 @@ async function loadSessionFiles(showStatus = true) {
 			else state.editor.setValue("", "primary");
 		}
 
+		if (state.renamingItemId) {
+			updateEditorHeader();
+			if (showStatus) {
+				setStatus("Loaded " + data.filesCount + " item(s).", "success");
+			}
+			return true;
+		}
+
 		renderTree();
 		renderTabs();
 		updateEditorHeader();
+		if (state.openTabs.size > 0) saveWorkspaceState();
 
 		if (showStatus) {
 			setStatus("Loaded " + data.filesCount + " item(s).", "success");
@@ -985,6 +1126,91 @@ async function loadSessionFiles(showStatus = true) {
 	} finally {
 		state.isLoadingFiles = false;
 	}
+}
+
+async function restoreWorkspaceState() {
+	if (!hasConnection()) return false;
+	if (state.openTabs.size > 0) return false;
+
+	const saved = loadJson(getWorkspaceStorageKey(), null);
+
+	if (!saved || !Array.isArray(saved.tabIds) || saved.tabIds.length === 0) {
+		return false;
+	}
+
+	const uniqueIds = Array.from(new Set(saved.tabIds.filter(Boolean)));
+	const restoredIds = [];
+	state.isRestoringWorkspace = true;
+
+	for (const fileId of uniqueIds.slice(0, 32)) {
+		const file = getLoadedFile(fileId);
+
+		if (!isScriptItem(file)) {
+			continue;
+		}
+
+		try {
+			const data = await fetchSource(getAuth(), file.fileId);
+			state.openTabs.set(file.fileId, {
+				fileId: file.fileId,
+				name: file.name,
+				className: file.className,
+				root: file.root,
+				relativePath: file.relativePath,
+				parentItemId: file.parentItemId || "",
+				source: data.source || "",
+				baseSourceHash: data.sourceHash || file.sourceHash || null,
+				sourceHash: data.sourceHash || file.sourceHash || null,
+				dirty: false,
+			});
+			state.projectSearchCache.set(file.fileId, data.source || "");
+			restoredIds.push(file.fileId);
+		} catch (error) {}
+	}
+
+	state.isRestoringWorkspace = false;
+
+	if (restoredIds.length === 0) {
+		clearWorkspaceState();
+		renderTabs();
+		updateEditorHeader();
+		return false;
+	}
+
+	const primaryId = restoredIds.includes(saved.currentFileId) ? saved.currentFileId : restoredIds[0];
+	const secondaryId = restoredIds.includes(saved.secondaryFileId) ? saved.secondaryFileId : "";
+
+	state.currentFileId = primaryId;
+	state.secondaryFileId = secondaryId;
+	state.activeGroup = saved.activeGroup === "secondary" && secondaryId ? "secondary" : "primary";
+
+	const primaryTab = state.openTabs.get(primaryId);
+	if (primaryTab) {
+		state.editor.setValue(primaryTab.source || "", "primary");
+		state.selectedKey = "item:" + primaryTab.fileId;
+		state.selectedPayload = {
+			root: primaryTab.root,
+			relativePath: primaryTab.relativePath,
+			itemId: primaryTab.fileId,
+			label: primaryTab.root + "/" + primaryTab.relativePath,
+		};
+	}
+
+	if (secondaryId) {
+		const secondaryTab = state.openTabs.get(secondaryId);
+		state.editor.setSplit(true);
+		if (secondaryTab) state.editor.setValue(secondaryTab.source || "", "secondary");
+	} else {
+		state.editor.setSplit(false);
+	}
+
+	renderTabs();
+	renderTree();
+	updateEditorHeader();
+	state.editor.focus(state.activeGroup);
+	saveWorkspaceState();
+	setStatus("Restored " + restoredIds.length + " open script(s).", "success");
+	return true;
 }
 
 function startPolling() {
@@ -1031,6 +1257,7 @@ async function connectSession() {
 
 	const ok = await loadSessionFiles(true);
 	if (ok) {
+		await restoreWorkspaceState();
 		startPolling();
 		closeConnectionModal();
 		showToast("Private session connected.", "success");
@@ -1038,6 +1265,7 @@ async function connectSession() {
 }
 
 function disconnectSession() {
+	const workspaceKey = getWorkspaceStorageKey();
 	state.sessionId = "";
 	state.secret = "";
 	state.files = [];
@@ -1051,6 +1279,7 @@ function disconnectSession() {
 	state.selectedPayload = null;
 	sessionStorage.removeItem(SESSION_STORAGE.sessionId);
 	sessionStorage.removeItem(SESSION_STORAGE.secret);
+	try { localStorage.removeItem(workspaceKey); } catch (error) {}
 
 	if (state.pollTimer) clearInterval(state.pollTimer);
 	state.editor.setValue("", "primary");
@@ -1208,6 +1437,7 @@ function startRenameSelected() {
 	}
 
 	state.renamingItemId = item.fileId;
+	state.renameStartedAt = Date.now();
 	state.selectedKey = "item:" + item.fileId;
 	state.selectedPayload = {
 		root: item.root,
@@ -1223,6 +1453,7 @@ async function renameItem(fileId, rawName) {
 	const item = getLoadedFile(fileId);
 	const newName = sanitizeName(rawName);
 	state.renamingItemId = "";
+	state.renameStartedAt = 0;
 
 	if (!item) {
 		showToast("Item no longer exists.", "warning");
@@ -1526,12 +1757,7 @@ function setupResizer() {
 function handleEditorKeys(event, group = state.activeGroup) {
 	const key = event.key.toLowerCase();
 
-	if ((event.ctrlKey || event.metaKey) && key === "f") {
-			event.preventDefault();
-			openProjectSearch();
-		}
-
-		if ((event.ctrlKey || event.metaKey) && key === "s") {
+	if ((event.ctrlKey || event.metaKey) && key === "s") {
 		event.preventDefault();
 		event.stopPropagation();
 		saveCurrentFile(false, getActiveFileId(group));
@@ -1542,6 +1768,18 @@ function handleEditorKeys(event, group = state.activeGroup) {
 		event.stopPropagation();
 		const fileId = getActiveFileId(group);
 		if (fileId) closeTab(fileId);
+	}
+
+	if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "e") {
+		event.preventDefault();
+		event.stopPropagation();
+		foldActiveScript();
+	}
+
+	if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === "e") {
+		event.preventDefault();
+		event.stopPropagation();
+		unfoldActiveScript();
 	}
 
 	if ((event.ctrlKey || event.metaKey) && key === "i") {
@@ -1614,22 +1852,20 @@ function bindEvents() {
 	refs.resetSettingsButton.addEventListener("click", resetSettings);
 
 	window.addEventListener("keydown", event => {
-		const key = event.key.toLowerCase();
-
-		if ((event.ctrlKey || event.metaKey) && key === "w") {
-			event.preventDefault();
-			event.stopImmediatePropagation();
-			if (state.currentFileId) closeTab(state.currentFileId);
-		}
+		handleGlobalShortcut(event);
 	}, true);
 
-	document.addEventListener("keydown", event => {
-		const key = event.key.toLowerCase();
+	window.addEventListener("beforeunload", event => {
+		saveWorkspaceState();
+		const hasDirtyTabs = Array.from(state.openTabs.values()).some(tab => tab.dirty);
+		if (!hasDirtyTabs) return;
+		event.preventDefault();
+		event.returnValue = "";
+	});
 
-		if ((event.ctrlKey || event.metaKey) && key === "f") {
-			event.preventDefault();
-			openProjectSearch();
-		}
+	document.addEventListener("keydown", event => {
+		if (handleGlobalShortcut(event)) return;
+		const key = event.key.toLowerCase();
 
 		if ((event.ctrlKey || event.metaKey) && key === "s") {
 			event.preventDefault();
@@ -1678,7 +1914,7 @@ function bootEditor() {
 		onFallbackKeyDown: handleEditorKeys,
 		onCursor(position, group) {
 			state.activeGroup = group || state.activeGroup;
-			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+S save · Ctrl+F search · drag/double-click tab to split";
+			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+W close tab · Ctrl+Shift+E fold · Ctrl+E unfold";
 			updateEditorHeader();
 		},
 		onActiveGroup: setActiveGroup,
@@ -1689,6 +1925,8 @@ function bootEditor() {
 		},
 		onCreate: () => openCreatePanel(getBestCreationParent(), "Script"),
 		onProjectSearch: openProjectSearch,
+		onFoldAll: foldActiveScript,
+		onUnfoldAll: unfoldActiveScript,
 	});
 }
 
@@ -1709,7 +1947,10 @@ function boot() {
 	if (hasConnection()) {
 		setTimeout(async () => {
 			const ok = await loadSessionFiles(true);
-			if (ok) startPolling();
+			if (ok) {
+				await restoreWorkspaceState();
+				startPolling();
+			}
 		}, 150);
 	} else {
 		setTimeout(openConnectionModal, 150);

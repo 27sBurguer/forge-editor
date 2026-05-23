@@ -30,6 +30,7 @@ export const STORAGE = {
 	sidebar: "Forge.SidebarWidth",
 	expanded: "Forge.ExpandedNodes",
 	settings: "Forge.EditorSettings",
+	workspace: "Forge.WorkspaceState",
 };
 
 export const SESSION_STORAGE = {
@@ -42,7 +43,7 @@ export const DEFAULT_SETTINGS = {
 	fontSize: 14,
 	autosaveMs: 3000,
 	wordWrap: "off",
-	editorTheme: "forge-codex",
+	editorTheme: "forge-dark",
 	minimap: true,
 };
 

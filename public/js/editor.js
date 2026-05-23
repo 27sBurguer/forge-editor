@@ -261,7 +261,7 @@ function getFallbackTheme(themeName) {
 		"forge-mono": ["#101010", "#e7e7e7"],
 		"forge-contrast": ["#000000", "#ffffff"],
 	};
-	return themes[themeName] || themes["forge-codex"];
+	return themes[themeName] || themes["forge-dark"];
 }
 
 export function createEditorController(options) {
@@ -313,6 +313,20 @@ export function createEditorController(options) {
 				target.fallback.focus();
 			}
 		},
+		foldAll(group = this.activeGroup) {
+			const target = groups[group] || groups.primary;
+			if (this.ready && target.editor) {
+				target.editor.trigger("forge", "editor.foldAll", {});
+				target.editor.focus();
+			}
+		},
+		unfoldAll(group = this.activeGroup) {
+			const target = groups[group] || groups.primary;
+			if (this.ready && target.editor) {
+				target.editor.trigger("forge", "editor.unfoldAll", {});
+				target.editor.focus();
+			}
+		},
 		setSplit(enabled) {
 			this.isSplit = !!enabled;
 			if (options.shell) options.shell.classList.toggle("split", this.isSplit);
@@ -325,7 +339,7 @@ export function createEditorController(options) {
 			}, 20);
 		},
 		applySettings(settings) {
-			const [background, color] = getFallbackTheme(settings.editorTheme || "forge-codex");
+			const [background, color] = getFallbackTheme(settings.editorTheme || "forge-dark");
 			for (const groupName of Object.keys(groups)) {
 				const target = groups[groupName];
 				target.fallback.style.fontFamily = settings.fontFamily;
@@ -341,7 +355,7 @@ export function createEditorController(options) {
 					});
 				}
 			}
-			if (this.ready && window.monaco) monaco.editor.setTheme(settings.editorTheme || "forge-codex");
+			if (this.ready && window.monaco) monaco.editor.setTheme(settings.editorTheme || "forge-dark");
 		},
 	};
 
@@ -369,7 +383,7 @@ export function createEditorController(options) {
 				target.editor = monaco.editor.create(target.host, {
 					value: target.fallback.value,
 					language: "lua",
-					theme: options.settings.editorTheme || "forge-codex",
+					theme: options.settings.editorTheme || "forge-dark",
 					automaticLayout: true,
 					fontFamily: options.settings.fontFamily,
 					fontSize: options.settings.fontSize,
@@ -396,8 +410,9 @@ export function createEditorController(options) {
 				target.editor.onDidFocusEditorText(() => { controller.activeGroup = groupName; options.onActiveGroup?.(groupName); });
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => options.onSave(groupName));
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW, () => options.onClose(groupName));
+				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyE, () => options.onFoldAll?.(groupName));
+				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE, () => options.onUnfoldAll?.(groupName));
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => options.onCreate(groupName));
-				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => options.onProjectSearch());
 				target.fallback.style.display = "none";
 			}
 
