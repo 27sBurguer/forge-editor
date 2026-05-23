@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Forge</title>
+	<link rel="icon" type="image/png" href="/assets/forge-logo.png" />
+	<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+	<div class="app" id="app">
+		<header class="titlebar">
+			<div class="brand">
+				<img class="brand-logo" src="/assets/forge-logo.png" alt="Forge" />
+				<div class="brand-copy">
+					<strong>Forge</strong>
+					<span>Professional Script Compiler</span>
+				</div>
+			</div>
+
+			<div class="command-center">
+				<span id="connectionDot" class="connection-dot disconnected"></span>
+				<span id="connectionLabel">Disconnected</span>
+			</div>
+
+			<div class="title-actions">
+				<button id="connectionButton" class="icon-button" title="Connection" aria-label="Connection">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><path d="M6 11h12v9H6z"/><path d="M12 15v2"/></svg>
+				</button>
+				<button id="settingsButton" class="icon-button" title="Settings" aria-label="Settings">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.42 1.12V21a2 2 0 1 1-4 0v-.08A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.12-.42H2.8a2 2 0 1 1 0-4h.08A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .42-1.12V2.8a2 2 0 1 1 4 0v.08A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9c.38.16.73.37 1 .6.33.28.72.42 1.12.42h.08a2 2 0 1 1 0 4h-.08A1.7 1.7 0 0 0 19.4 15z"/></svg>
+				</button>
+			</div>
+		</header>
+
+		<aside class="sidebar">
+			<div class="sidebar-title">
+				<span>Explorer</span>
+				<div class="sidebar-actions">
+					<button id="refreshButton" class="icon-button" title="Refresh tree" aria-label="Refresh tree">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M19 11a7 7 0 0 0-11.9-4.95L4 9"/><path d="M5 13a7 7 0 0 0 11.9 4.95L20 15"/></svg>
+					</button>
+				</div>
+			</div>
+
+			<div class="connection-card">
+				<div class="connection-card-title">Private session</div>
+				<div id="status" class="status compact">Open connection settings to unlock the workspace.</div>
+			</div>
+
+			<div class="project-header">
+				<span>Project</span>
+				<span id="fileCount" class="file-count">0 items</span>
+			</div>
+
+			<div class="search-wrap">
+				<input id="searchInput" placeholder="Search by name, class or path" autocomplete="off" />
+			</div>
+
+			<div id="tree" class="tree"></div>
+		</aside>
+
+		<div id="resizer" class="resizer"></div>
+
+		<main class="main">
+			<div id="tabs" class="tabs"></div>
+
+			<div class="editor-header">
+				<div class="editor-title">
+					<strong id="fileTitle">No file open</strong>
+					<span id="filePath">Connect to a private Forge session and open a script.</span>
+				</div>
+				<div class="editor-actions">
+					<button id="projectSearchButton" class="secondary-button" title="Search project">Search</button>
+					<button id="splitButton" class="secondary-button hidden-action" title="Open active tab to the right">Split</button>
+					<button id="closeSplitButton" class="secondary-button" title="Close split view">Close Split</button>
+					<button id="saveButton" class="secondary-button">Save</button>
+				</div>
+			</div>
+
+			<div class="editor-shell" id="editorShell">
+				<div class="editor-pane primary-pane" id="primaryPane">
+					<div id="monacoEditor"></div>
+					<textarea id="fallbackEditor" spellcheck="false"></textarea>
+				</div>
+				<div class="editor-split-line" id="editorSplitLine"></div>
+				<div class="editor-pane secondary-pane" id="secondaryPane">
+					<div class="secondary-pane-bar"><span id="secondaryTitle">Split View</span><button id="secondaryCloseButton" class="tab-close" aria-label="Close split"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg></button></div>
+					<div id="monacoEditorSecondary"></div>
+					<textarea id="fallbackEditorSecondary" spellcheck="false"></textarea>
+				</div>
+				<div id="splitDropHint" class="split-drop-hint">Drop tab here to split right</div>
+				<div id="placeholder" class="placeholder">
+					<div class="placeholder-card">
+						<img class="placeholder-logo" src="/assets/forge-logo.png" alt="Forge" />
+						<h1>Forge</h1>
+						<p>A private script workspace for synced editing, safe saves, project search and split views.</p>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<footer class="footer">
+			<span id="footerLeft">Ready</span>
+			<span id="footerRight">Ctrl+S save · Ctrl+F search · Ctrl+I create · drag/double-click tab to split</span>
+		</footer>
+	</div>
+
+	<div id="connectionModal" class="modal-backdrop">
+		<div class="modal connection-modal">
+			<div class="modal-head">
+				<div class="modal-title">Private Connection</div>
+				<button id="closeConnectionButton" class="icon-button" aria-label="Close connection modal">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div class="secure-note">
+					<strong>Session data is hidden from the sidebar.</strong>
+					<span>The server now checks the secret before reading, saving, moving or deleting files.</span>
+				</div>
+				<label class="field-label" for="sessionInput">Session ID</label>
+				<input id="sessionInput" type="password" placeholder="Paste session ID" autocomplete="off" />
+				<label class="field-label" for="secretInput">Session Secret</label>
+				<input id="secretInput" type="password" placeholder="Paste session secret" autocomplete="off" />
+				<div class="modal-actions split-actions">
+					<button id="disconnectButton" class="secondary-button">Forget</button>
+					<div class="right-actions">
+						<button id="cancelConnectionButton" class="secondary-button">Cancel</button>
+						<button id="loadButton" class="primary-button">Connect</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="createModal" class="modal-backdrop popover-backdrop">
+		<div class="modal create-modal">
+			<div class="modal-head compact-head">
+				<div>
+					<div class="modal-title">New Instance</div>
+					<div id="createLocation" class="modal-subtitle">Parent: none</div>
+				</div>
+				<button id="closeCreateButton" class="icon-button" aria-label="Close create modal">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+				</button>
+			</div>
+			<div class="modal-body create-body">
+				<div id="typeGrid" class="create-list"></div>
+				<div class="create-name-row">
+					<label class="field-label" for="createNameInput">Name</label>
+					<input id="createNameInput" placeholder="Instance name" autocomplete="off" />
+				</div>
+				<div class="modal-actions">
+					<button id="cancelCreateButton" class="secondary-button">Cancel</button>
+					<button id="confirmCreateButton" class="primary-button">Create</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="projectSearchModal" class="modal-backdrop search-backdrop">
+		<div class="modal search-modal">
+			<div class="modal-head">
+				<div>
+					<div class="modal-title">Project Search</div>
+					<div class="modal-subtitle">Search loaded scripts by text, line and path.</div>
+				</div>
+				<button id="closeProjectSearchButton" class="icon-button" aria-label="Close search modal">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div class="project-search-row">
+					<input id="projectSearchInput" placeholder="Search in all scripts" autocomplete="off" />
+					<button id="runProjectSearchButton" class="primary-button">Find</button>
+				</div>
+				<div id="projectSearchStatus" class="search-status">Type a term and press Enter.</div>
+				<div id="projectSearchResults" class="search-results"></div>
+			</div>
+		</div>
+	</div>
+
+	<div id="confirmModal" class="modal-backdrop">
+		<div class="modal">
+			<div class="modal-head">
+				<div id="confirmTitle" class="modal-title">Confirm</div>
+				<button id="closeConfirmButton" class="icon-button" aria-label="Close confirm modal">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div id="confirmMessage" class="location-box"></div>
+				<div class="modal-actions">
+					<button id="cancelConfirmButton" class="secondary-button">Cancel</button>
+					<button id="acceptConfirmButton" class="danger-button">Confirm</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="settingsModal" class="modal-backdrop">
+		<div class="modal">
+			<div class="modal-head">
+				<div class="modal-title">Editor Settings</div>
+				<button id="closeSettingsButton" class="icon-button" aria-label="Close settings modal">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+				</button>
+			</div>
+			<div class="modal-body settings-body">
+				<div class="setting-grid">
+					<label for="fontFamilyInput">Font family</label>
+					<input id="fontFamilyInput" placeholder="JetBrains Mono, Cascadia Code, Fira Code, Consolas, monospace" />
+					<label for="fontSizeInput">Font size</label>
+					<input id="fontSizeInput" type="number" min="10" max="28" />
+					<label for="autosaveInput">Autosave ms</label>
+					<input id="autosaveInput" type="number" min="1000" max="15000" />
+					<label for="wordWrapInput">Word wrap</label>
+					<select id="wordWrapInput">
+						<option value="off">Off</option>
+						<option value="on">On</option>
+					</select>
+					<label for="editorThemeInput">Editor theme</label>
+					<select id="editorThemeInput">
+						<option value="forge-codex">Codex Graphite</option>
+						<option value="forge-dark">Forge Dark</option>
+						<option value="forge-graphite">Graphite</option>
+						<option value="forge-void">Void</option>
+						<option value="forge-midnight">Midnight</option>
+						<option value="forge-warm">Warm Dark</option>
+						<option value="forge-forest">Forest</option>
+						<option value="forge-rose-pine">Rose Pine</option>
+						<option value="forge-nord">Nord</option>
+						<option value="forge-dracula">Dracula</option>
+						<option value="forge-ocean">Ocean</option>
+						<option value="forge-mono">Mono</option>
+						<option value="forge-contrast">High Contrast</option>
+					</select>
+					<label for="minimapInput">Minimap</label>
+					<input id="minimapInput" type="checkbox" />
+				</div>
+				<div class="editor-preview-card">
+					<div class="preview-head">
+						<span>Theme Preview</span>
+						<span id="settingsPreviewMeta">Lua · 14px · 3000ms</span>
+					</div>
+					<pre id="settingsPreview" class="editor-preview"><code><span class="kw">local</span> Players = game:<span class="fn">GetService</span>(<span class="str">"Players"</span>)
+
+Players.PlayerAdded:<span class="fn">Connect</span>(<span class="kw">function</span>(player)
+	<span class="fn">print</span>(player.Name)
+<span class="kw">end</span>)</code></pre>
+				</div>
+				<div class="modal-actions">
+					<button id="resetSettingsButton" class="secondary-button">Reset</button>
+					<button id="saveSettingsButton" class="primary-button">Apply</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="toastStack" class="toast-stack"></div>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+	<script type="module" src="/js/app.js"></script>
+</body>
+</html>
