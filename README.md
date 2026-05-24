@@ -83,9 +83,9 @@ https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.
 
 The Electron app hides the desktop download button, because the user is already inside the app.
 
-## Roblox Plugin button
+## Plugin button
 
-The title bar includes a Roblox Plugin button pointing to:
+The title bar includes a Plugin button pointing to:
 
 ```txt
 https://create.roblox.com/store/asset/110405258188669/Forge-Codex
@@ -102,13 +102,13 @@ Large Image Key: forge_logo
 
 The activity updates when the user opens or switches scripts. Discord must be open on the user's computer for Rich Presence to appear.
 
-The Discord buttons are `Open Forge` and `Roblox Plugin`.
+The Discord buttons are `Open Forge` and `Plugin`.
 
 ## Auto-updates
 
 The app uses `electron-updater` with GitHub Releases. When you publish a newer tag, the installed app can detect and download the update automatically.
 
-## Roblox Studio plugin
+## Plugin
 
 The `plugin/` folder includes `ForgePlugin.txt`.
 
@@ -121,7 +121,7 @@ The plugin automatically detects the best API target:
 
 So if the Forge Desktop App is open, the plugin uses the local app. If not, it falls back to Render cloud.
 
-The plugin also pauses during Roblox Studio Play Mode to avoid runtime conflicts.
+The plugin also pauses during Play Mode to avoid runtime conflicts.
 
 
 ## Release note

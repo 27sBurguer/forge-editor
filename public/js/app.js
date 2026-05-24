@@ -111,6 +111,10 @@ const refs = {
 	betaLanguageSelect: document.getElementById("betaLanguageSelect"),
 	betaContinueButton: document.getElementById("betaContinueButton"),
 	toastStack: document.getElementById("toastStack"),
+	sessionGate: document.getElementById("sessionGate"),
+	gateSessionInput: document.getElementById("gateSessionInput"),
+	gateSecretInput: document.getElementById("gateSecretInput"),
+	gateConnectButton: document.getElementById("gateConnectButton"),
 };
 
 setupUi(refs);
@@ -149,6 +153,7 @@ const state = {
 	hasInitializedRootExpansion: false,
 	isRestoringWorkspace: false,
 	renameStartedAt: 0,
+	suppressViewStateSaveUntil: 0,
 };
 
 function getAuth() {
@@ -206,6 +211,8 @@ function updateConnectionUi(connected, label) {
 	refs.connectionDot.classList.toggle("connected", !!connected);
 	refs.connectionDot.classList.toggle("disconnected", !connected);
 	refs.connectionLabel.textContent = label || (connected ? "Connected" : "Disconnected");
+	document.body.classList.toggle("no-session", !connected);
+	document.body.classList.toggle("workspace-ready", !!connected);
 }
 
 let lastDiscordActivitySignature = "";
@@ -218,7 +225,7 @@ function updateDesktopDiscordActivity(activeTab = null) {
 		state: activeTab.className + " · " + activeTab.root,
 	} : {
 		details: hasConnection() ? "Browsing project files" : "Waiting for private session",
-		state: hasConnection() ? "Workspace connected" : "Private compiler workspace",
+		state: hasConnection() ? "Workspace connected" : "Private IDE workspace",
 	};
 
 	const signature = JSON.stringify(payload);
@@ -421,6 +428,7 @@ function getActiveFileId(group = state.activeGroup) {
 
 function saveEditorViewForGroup(group = state.activeGroup) {
 	if (!state.editor) return;
+	if (Date.now() < state.suppressViewStateSaveUntil) return;
 
 	const fileId = getActiveFileId(group);
 	const tab = fileId ? state.openTabs.get(fileId) : null;
@@ -964,6 +972,7 @@ function switchTab(fileId, group = "primary") {
 
 	const targetGroup = group === "secondary" ? "secondary" : "primary";
 	saveEditorViewForGroup(targetGroup);
+	state.suppressViewStateSaveUntil = Date.now() + 650;
 
 	if (targetGroup === "secondary") {
 		state.secondaryFileId = fileId;
@@ -987,8 +996,11 @@ function switchTab(fileId, group = "primary") {
 	renderTree();
 	updateEditorHeader();
 	setTimeout(() => state.editor.focus(state.activeGroup), 0);
-	saveWorkspaceState(false);
-	setTimeout(() => saveWorkspaceState(true), 25);
+	setTimeout(() => {
+		state.suppressViewStateSaveUntil = 0;
+		saveEditorViewForGroup(state.activeGroup);
+		saveWorkspaceState(false);
+	}, 700);
 }
 
 function splitTab(fileId = state.currentFileId) {
@@ -1361,9 +1373,9 @@ function closeConnectionModal() {
 	refs.connectionModal.classList.remove("open");
 }
 
-async function connectSession() {
-	const id = refs.sessionInput.value.trim();
-	const secret = refs.secretInput.value.trim();
+async function connectSession(idOverride = null, secretOverride = null) {
+	const id = String(idOverride !== null ? idOverride : refs.sessionInput.value).trim();
+	const secret = String(secretOverride !== null ? secretOverride : refs.secretInput.value).trim();
 
 	if (!id || !secret) {
 		showToast("Session ID and secret are required.", "warning");
@@ -1375,6 +1387,8 @@ async function connectSession() {
 	sessionStorage.setItem(SESSION_STORAGE.sessionId, id);
 	sessionStorage.setItem(SESSION_STORAGE.secret, secret);
 
+	document.body.classList.add("session-loading");
+	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Opening workspace...";
 	setStatus("Connecting privately...", "warning");
 	state.openTabs.clear();
 	state.currentFileId = "";
@@ -1391,6 +1405,8 @@ async function connectSession() {
 		closeConnectionModal();
 		showToast("Private session connected.", "success");
 	}
+	document.body.classList.remove("session-loading");
+	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Enter workspace";
 }
 
 function disconnectSession() {
@@ -1947,6 +1963,9 @@ function handleEditorKeys(event, group = state.activeGroup) {
 
 function bindEvents() {
 	refs.loadButton.addEventListener("click", connectSession);
+	if (refs.gateConnectButton) refs.gateConnectButton.addEventListener("click", () => connectSession(refs.gateSessionInput.value, refs.gateSecretInput.value));
+	if (refs.gateSessionInput) refs.gateSessionInput.addEventListener("keydown", event => { if (event.key === "Enter") connectSession(refs.gateSessionInput.value, refs.gateSecretInput.value); });
+	if (refs.gateSecretInput) refs.gateSecretInput.addEventListener("keydown", event => { if (event.key === "Enter") connectSession(refs.gateSessionInput.value, refs.gateSecretInput.value); });
 	refs.connectionButton.addEventListener("click", openConnectionModal);
 	refs.closeConnectionButton.addEventListener("click", closeConnectionModal);
 	refs.cancelConnectionButton.addEventListener("click", closeConnectionModal);
@@ -2085,7 +2104,7 @@ function bootEditor() {
 		onFallbackKeyDown: handleEditorKeys,
 		onCursor(position, group) {
 			state.activeGroup = group || state.activeGroup;
-			saveEditorViewForGroup(group);
+			if (Date.now() >= state.suppressViewStateSaveUntil) saveEditorViewForGroup(group);
 			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+1-9 tabs · Ctrl+W close tab · Ctrl+Shift+E fold · Ctrl+E unfold";
 			updateEditorHeader();
 		},

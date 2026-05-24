@@ -9,7 +9,7 @@ function createRobloxPluginButton() {
 	button.href = DESKTOP_ROBLOX_PLUGIN_URL;
 	button.target = "_blank";
 	button.rel = "noopener";
-	button.textContent = "Roblox Plugin";
+	button.textContent = "Plugin";
 	return button;
 }
 
@@ -59,8 +59,8 @@ function setBadgeText(text) {
 
 		if (window.forgeDesktop.setDiscordActivity) {
 			window.forgeDesktop.setDiscordActivity({
-				details: "Building scripts with Forge",
-				state: "Private compiler workspace",
+				details: "Using Forge",
+				state: "Private IDE workspace",
 			}).catch(() => {});
 		}
 

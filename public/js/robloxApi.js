@@ -195,7 +195,7 @@ export const CONTEXT_COMPLETIONS = {
 			["UnbindFromRenderStep", "UnbindFromRenderStep(\"${1:Name}\")", "RunService method", "Removes a render step binding."],
 			["IsClient", "IsClient()", "RunService method", "True on client."],
 			["IsServer", "IsServer()", "RunService method", "True on server."],
-			["IsStudio", "IsStudio()", "RunService method", "True in Studio."],
+			["IsStudio", "IsStudio()", "RunService method", "True in the edit environment."],
 			["IsRunning", "IsRunning()", "RunService method", "True while simulation is running."],
 		],
 		events: [

@@ -328,11 +328,18 @@ export function createEditorController(options) {
 				const safeColumn = Math.max(1, Math.min(maxColumn, Number(rawPosition.column) || 1));
 				const safePosition = { lineNumber: safeLine, column: safeColumn };
 
-				if (viewState.state) target.editor.restoreViewState(viewState.state);
-				target.editor.setPosition(safePosition);
-				target.editor.setScrollTop(Math.max(0, Number(viewState.scrollTop) || 0));
-				target.editor.setScrollLeft(Math.max(0, Number(viewState.scrollLeft) || 0));
-				target.editor.revealPositionInCenterIfOutsideViewport(safePosition);
+				const scrollTop = Math.max(0, Number(viewState.scrollTop) || 0);
+				const scrollLeft = Math.max(0, Number(viewState.scrollLeft) || 0);
+				const applyState = () => {
+					if (viewState.state) target.editor.restoreViewState(viewState.state);
+					target.editor.setPosition(safePosition);
+					target.editor.setScrollTop(scrollTop);
+					target.editor.setScrollLeft(scrollLeft);
+				};
+				applyState();
+				requestAnimationFrame(applyState);
+				setTimeout(applyState, 40);
+				setTimeout(applyState, 160);
 				return;
 			}
 

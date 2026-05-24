@@ -40,15 +40,15 @@ function sanitizePresenceText(value, fallback, maxLength = 128) {
 
 function buildDiscordActivity(payload = {}) {
 	return {
-		details: sanitizePresenceText(payload.details, "Editing scripts with Forge"),
-		state: sanitizePresenceText(payload.state, "Private compiler workspace"),
+		details: sanitizePresenceText(payload.details, "Using Forge"),
+		state: sanitizePresenceText(payload.state, "Private IDE workspace"),
 		largeImageKey: DISCORD_LARGE_IMAGE_KEY,
 		largeImageText: "Forge",
 		startTimestamp: activityStartedAt,
 		instance: false,
 		buttons: [
 			{ label: "Open Forge", url: FORGE_WEB_URL },
-			{ label: "Roblox Plugin", url: ROBLOX_PLUGIN_URL },
+			{ label: "Plugin", url: ROBLOX_PLUGIN_URL },
 		],
 	};
 }
@@ -87,8 +87,8 @@ function initializeDiscordPresence() {
 		discordClient.on("ready", () => {
 			discordReady = true;
 			setDiscordPresence(queuedDiscordActivity || {
-				details: "Building scripts with Forge",
-				state: "Private compiler workspace",
+				details: "Using Forge",
+				state: "Private IDE workspace",
 			}).catch(() => {});
 		});
 
@@ -176,11 +176,6 @@ async function createWindow() {
 		}
 	});
 
-	mainWindow.on("close", event => {
-		if (!isQuitting) {
-			// Let the page warn about unsaved scripts if needed.
-		}
-	});
 
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
 		shell.openExternal(url);
