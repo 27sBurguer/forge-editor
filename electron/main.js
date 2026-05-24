@@ -17,6 +17,7 @@ const DISCORD_CLIENT_ID = "1507948057289822229";
 const DISCORD_LARGE_IMAGE_KEY = "forge_logo";
 const FORGE_WEB_URL = "https://forge-editor.onrender.com";
 const FORGE_DOWNLOAD_URL = "https://github.com/27sBurguer/forge-editor/releases/latest";
+const ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
 const activityStartedAt = new Date();
 
 let mainWindow = null;
@@ -47,7 +48,7 @@ function buildDiscordActivity(payload = {}) {
 		instance: false,
 		buttons: [
 			{ label: "Open Forge", url: FORGE_WEB_URL },
-			{ label: "Download App", url: FORGE_DOWNLOAD_URL },
+			{ label: "Roblox Plugin", url: ROBLOX_PLUGIN_URL },
 		],
 	};
 }

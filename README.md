@@ -102,6 +102,8 @@ Large Image Key: forge_logo
 
 The activity updates when the user opens or switches scripts. Discord must be open on the user's computer for Rich Presence to appear.
 
+The Discord buttons are `Open Forge` and `Roblox Plugin`.
+
 ## Auto-updates
 
 The app uses `electron-updater` with GitHub Releases. When you publish a newer tag, the installed app can detect and download the update automatically.

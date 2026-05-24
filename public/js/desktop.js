@@ -1,10 +1,12 @@
+const DESKTOP_ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
+
 const ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
 
 function createRobloxPluginButton() {
 	const button = document.createElement("a");
 	button.id = "desktopRobloxPluginButton";
 	button.className = "roblox-plugin-button";
-	button.href = ROBLOX_PLUGIN_URL;
+	button.href = DESKTOP_ROBLOX_PLUGIN_URL;
 	button.target = "_blank";
 	button.rel = "noopener";
 	button.textContent = "Roblox Plugin";
@@ -38,6 +40,8 @@ function setBadgeText(text) {
 	const badge = document.getElementById("desktopUpdateBadge");
 	if (badge) badge.textContent = text;
 }
+
+hideDesktopDownloadButton();
 
 (async function bootDesktopIntegration() {
 	if (!window.forgeDesktop) return;

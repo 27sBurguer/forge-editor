@@ -54,6 +54,11 @@ button:disabled {
 	opacity: 0.55;
 }
 
+
+.forge-desktop-app #downloadAppButton {
+	display: none !important;
+}
+
 svg {
 	width: 16px;
 	height: 16px;
