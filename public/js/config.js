@@ -31,6 +31,7 @@ export const STORAGE = {
 	expanded: "Forge.ExpandedNodes",
 	settings: "Forge.EditorSettings",
 	workspace: "Forge.WorkspaceState",
+	language: "Forge.InterfaceLanguage",
 };
 
 export const SESSION_STORAGE = {

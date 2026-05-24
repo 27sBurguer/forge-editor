@@ -212,6 +212,8 @@
 			</div>
 			<div class="modal-body settings-body">
 				<div class="setting-grid">
+					<label for="languageInput">Interface language</label>
+					<select id="languageInput"></select>
 					<label for="fontFamilyInput">Font family</label>
 					<input id="fontFamilyInput" placeholder="JetBrains Mono, Cascadia Code, Fira Code, Consolas, monospace" />
 					<label for="fontSizeInput">Font size</label>
@@ -256,6 +258,25 @@ Players.PlayerAdded:<span class="fn">Connect</span>(<span class="kw">function</s
 				<div class="modal-actions">
 					<button id="resetSettingsButton" class="secondary-button">Reset</button>
 					<button id="saveSettingsButton" class="primary-button">Apply</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="betaWarningModal" class="modal-backdrop beta-backdrop">
+		<div class="modal beta-modal">
+			<div class="beta-mark">!</div>
+			<div class="beta-copy">
+				<div id="betaEyebrow" class="beta-eyebrow">Forge Beta Access</div>
+				<h2 id="betaTitle">ATTENTION</h2>
+				<p id="betaWarningText">This application is currently in BETA and is only available on a limited number of computers used by the project development team. If you have access, you may use it freely, test it, and use it in your Roblox projects.</p>
+				<p id="betaWarningNote" class="beta-note">Only the interface language changes. Your code is never translated.</p>
+				<div class="beta-controls">
+					<label for="betaLanguageSelect">Language</label>
+					<select id="betaLanguageSelect"></select>
+				</div>
+				<div class="modal-actions beta-actions">
+					<button id="betaContinueButton" class="primary-button">Continue to Forge</button>
 				</div>
 			</div>
 		</div>

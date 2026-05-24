@@ -36,6 +36,7 @@ import {
 } from "./ui.js";
 import { createEditorController } from "./editor.js";
 import { setIcon, svgIcon } from "./icons.js";
+import { applyLanguage, getLanguage, populateLanguageSelect, t } from "./i18n.js";
 
 const refs = {
 	sessionInput: document.getElementById("sessionInput"),
@@ -95,6 +96,7 @@ const refs = {
 	settingsButton: document.getElementById("settingsButton"),
 	settingsModal: document.getElementById("settingsModal"),
 	closeSettingsButton: document.getElementById("closeSettingsButton"),
+	languageInput: document.getElementById("languageInput"),
 	fontFamilyInput: document.getElementById("fontFamilyInput"),
 	fontSizeInput: document.getElementById("fontSizeInput"),
 	autosaveInput: document.getElementById("autosaveInput"),
@@ -105,6 +107,9 @@ const refs = {
 	saveSettingsButton: document.getElementById("saveSettingsButton"),
 	settingsPreview: document.getElementById("settingsPreview"),
 	settingsPreviewMeta: document.getElementById("settingsPreviewMeta"),
+	betaWarningModal: document.getElementById("betaWarningModal"),
+	betaLanguageSelect: document.getElementById("betaLanguageSelect"),
+	betaContinueButton: document.getElementById("betaContinueButton"),
 	toastStack: document.getElementById("toastStack"),
 };
 
@@ -136,6 +141,8 @@ const state = {
 		...DEFAULT_SETTINGS,
 		...loadJson(STORAGE.settings, DEFAULT_SETTINGS),
 	},
+	language: getLanguage(),
+	viewRestoreTokens: { primary: 0, secondary: 0 },
 	editor: null,
 	lastConnectionErrorAt: 0,
 	projectSearchCache: new Map(),
@@ -153,6 +160,10 @@ function getAuth() {
 
 function hasConnection() {
 	return !!state.sessionId && !!state.secret;
+}
+
+function tx(key) {
+	return t(state.language, key);
 }
 
 function getWorkspaceStorageKey() {
@@ -430,9 +441,20 @@ function saveAllVisibleEditorViewStates() {
 function restoreEditorViewForTab(tab, group = state.activeGroup) {
 	if (!state.editor) return;
 
-	setTimeout(() => {
-		state.editor.restoreViewState(tab && tab.viewState ? tab.viewState : null, group);
-	}, 0);
+	const targetGroup = group === "secondary" ? "secondary" : "primary";
+	const token = (state.viewRestoreTokens[targetGroup] || 0) + 1;
+	state.viewRestoreTokens[targetGroup] = token;
+	const viewState = tab && tab.viewState ? tab.viewState : null;
+
+	const apply = () => {
+		if (state.viewRestoreTokens[targetGroup] !== token) return;
+		state.editor.restoreViewState(viewState, targetGroup);
+	};
+
+	apply();
+	requestAnimationFrame(apply);
+	setTimeout(apply, 20);
+	setTimeout(apply, 80);
 }
 
 function setActiveGroup(group) {
@@ -461,10 +483,10 @@ function updateEditorHeader() {
 	}
 
 	updateDesktopDiscordActivity(null);
-	refs.fileTitle.textContent = "No file open";
+	refs.fileTitle.textContent = tx("noFileOpen");
 	refs.filePath.textContent = hasConnection()
 		? "Open a script from the Explorer."
-		: "Connect to a private Forge session and open a script.";
+		: tx("filePathEmpty");
 	document.title = "Forge";
 }
 
@@ -1690,6 +1712,7 @@ async function deleteSelectedItem() {
 }
 
 function openSettings() {
+	populateLanguageSelect(refs.languageInput, state.language);
 	refs.fontFamilyInput.value = state.settings.fontFamily;
 	refs.fontSizeInput.value = state.settings.fontSize;
 	refs.autosaveInput.value = state.settings.autosaveMs;
@@ -1705,6 +1728,9 @@ function closeSettings() {
 }
 
 function applySettings() {
+	state.language = applyLanguage(refs.languageInput ? refs.languageInput.value : state.language);
+	populateLanguageSelect(refs.betaLanguageSelect, state.language);
+	updateEditorHeader();
 	state.settings = {
 		fontFamily: refs.fontFamilyInput.value.trim() || DEFAULT_SETTINGS.fontFamily,
 		fontSize: clamp(Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize, 10, 28),
@@ -1717,7 +1743,7 @@ function applySettings() {
 	saveJson(STORAGE.settings, state.settings);
 	state.editor.applySettings(state.settings);
 	closeSettings();
-	showToast("Settings applied.", "success");
+	showToast(tx("settings") + " applied.", "success");
 }
 
 function resetSettings() {
@@ -1833,6 +1859,29 @@ function updateSettingsPreview() {
 	refs.settingsPreviewMeta.textContent = "Lua · " + (Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize) + "px · " + (Number(refs.autosaveInput.value) || DEFAULT_SETTINGS.autosaveMs) + "ms";
 }
 
+function openBetaWarning(onContinue) {
+	if (!refs.betaWarningModal) {
+		if (typeof onContinue === "function") onContinue();
+		return;
+	}
+
+	populateLanguageSelect(refs.betaLanguageSelect, state.language);
+	applyLanguage(state.language);
+	refs.betaWarningModal.classList.add("open");
+	refs.betaWarningModal.dataset.waiting = "true";
+	refs.betaWarningModal._onContinue = onContinue || null;
+}
+
+function closeBetaWarning() {
+	if (!refs.betaWarningModal) return;
+	refs.betaWarningModal.classList.remove("open");
+	refs.betaWarningModal.dataset.waiting = "false";
+	const callback = refs.betaWarningModal._onContinue;
+	refs.betaWarningModal._onContinue = null;
+	if (typeof callback === "function") callback();
+}
+
+
 function setupResizer() {
 	const saved = Number(localStorage.getItem(STORAGE.sidebar));
 	if (saved) {
@@ -1914,7 +1963,7 @@ function bindEvents() {
 		if (event.key === "Enter") runProjectSearch();
 		if (event.key === "Escape") closeProjectSearch();
 	});
-	for (const input of [refs.fontFamilyInput, refs.fontSizeInput, refs.autosaveInput, refs.wordWrapInput, refs.editorThemeInput, refs.minimapInput]) {
+	for (const input of [refs.languageInput, refs.fontFamilyInput, refs.fontSizeInput, refs.autosaveInput, refs.wordWrapInput, refs.editorThemeInput, refs.minimapInput]) {
 		input.addEventListener("input", updateSettingsPreview);
 		input.addEventListener("change", updateSettingsPreview);
 	}
@@ -1957,6 +2006,21 @@ function bindEvents() {
 	refs.closeSettingsButton.addEventListener("click", closeSettings);
 	refs.saveSettingsButton.addEventListener("click", applySettings);
 	refs.resetSettingsButton.addEventListener("click", resetSettings);
+	if (refs.languageInput) {
+		refs.languageInput.addEventListener("change", () => {
+			state.language = applyLanguage(refs.languageInput.value);
+			populateLanguageSelect(refs.betaLanguageSelect, state.language);
+			updateEditorHeader();
+		});
+	}
+	if (refs.betaLanguageSelect) {
+		refs.betaLanguageSelect.addEventListener("change", () => {
+			state.language = applyLanguage(refs.betaLanguageSelect.value);
+			populateLanguageSelect(refs.languageInput, state.language);
+			updateEditorHeader();
+		});
+	}
+	if (refs.betaContinueButton) refs.betaContinueButton.addEventListener("click", closeBetaWarning);
 
 	window.addEventListener("keydown", event => {
 		handleGlobalShortcut(event);
@@ -2048,6 +2112,9 @@ function boot() {
 	setupResizer();
 	bootEditor();
 	bindEvents();
+	populateLanguageSelect(refs.languageInput, state.language);
+	populateLanguageSelect(refs.betaLanguageSelect, state.language);
+	applyLanguage(state.language);
 	renderTree();
 	updateEditorHeader();
 	updateConnectionUi(hasConnection(), hasConnection() ? "Connected" : "Disconnected");
@@ -2060,8 +2127,9 @@ function boot() {
 				startPolling();
 			}
 		}, 150);
+		setTimeout(() => openBetaWarning(null), 180);
 	} else {
-		setTimeout(openConnectionModal, 150);
+		setTimeout(() => openBetaWarning(openConnectionModal), 150);
 	}
 }
 

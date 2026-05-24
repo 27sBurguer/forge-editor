@@ -320,10 +320,19 @@ export function createEditorController(options) {
 			}
 
 			if (this.ready && target.editor && viewState.type === "monaco") {
+				const model = target.editor.getModel();
+				const maxLine = model ? model.getLineCount() : 1;
+				const rawPosition = viewState.position || { lineNumber: 1, column: 1 };
+				const safeLine = Math.max(1, Math.min(maxLine, Number(rawPosition.lineNumber) || 1));
+				const maxColumn = model ? model.getLineMaxColumn(safeLine) : 1;
+				const safeColumn = Math.max(1, Math.min(maxColumn, Number(rawPosition.column) || 1));
+				const safePosition = { lineNumber: safeLine, column: safeColumn };
+
 				if (viewState.state) target.editor.restoreViewState(viewState.state);
-				if (viewState.position) target.editor.setPosition(viewState.position);
-				if (typeof viewState.scrollTop === "number") target.editor.setScrollTop(viewState.scrollTop);
-				if (typeof viewState.scrollLeft === "number") target.editor.setScrollLeft(viewState.scrollLeft);
+				target.editor.setPosition(safePosition);
+				target.editor.setScrollTop(Math.max(0, Number(viewState.scrollTop) || 0));
+				target.editor.setScrollLeft(Math.max(0, Number(viewState.scrollLeft) || 0));
+				target.editor.revealPositionInCenterIfOutsideViewport(safePosition);
 				return;
 			}
 
@@ -337,10 +346,11 @@ export function createEditorController(options) {
 			const target = groups[group] || groups.primary;
 
 			if (this.ready && target.editor) {
-				target.editor.setPosition({ lineNumber: 1, column: 1 });
+				const firstPosition = { lineNumber: 1, column: 1 };
+				target.editor.setPosition(firstPosition);
 				target.editor.setScrollTop(0);
 				target.editor.setScrollLeft(0);
-				target.editor.revealPositionNearTop({ lineNumber: 1, column: 1 });
+				target.editor.revealPositionNearTop(firstPosition);
 				return;
 			}
 
@@ -352,8 +362,18 @@ export function createEditorController(options) {
 		setValue(value, group = this.activeGroup) {
 			const target = groups[group] || groups.primary;
 			target.applyingValue = true;
-			if (this.ready && target.editor) target.editor.setValue(value || "");
+			if (this.ready && target.editor) {
+				target.editor.setValue(value || "");
+				const firstPosition = { lineNumber: 1, column: 1 };
+				target.editor.setPosition(firstPosition);
+				target.editor.setScrollTop(0);
+				target.editor.setScrollLeft(0);
+			}
 			target.fallback.value = value || "";
+			target.fallback.selectionStart = 0;
+			target.fallback.selectionEnd = 0;
+			target.fallback.scrollTop = 0;
+			target.fallback.scrollLeft = 0;
 			setTimeout(() => { target.applyingValue = false; }, 0);
 		},
 		focus(group = this.activeGroup) {
