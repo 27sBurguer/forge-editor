@@ -186,6 +186,26 @@ function updateConnectionUi(connected, label) {
 	refs.connectionLabel.textContent = label || (connected ? "Connected" : "Disconnected");
 }
 
+let lastDiscordActivitySignature = "";
+
+function updateDesktopDiscordActivity(activeTab = null) {
+	if (!window.forgeDesktop || !window.forgeDesktop.setDiscordActivity) return;
+
+	const payload = activeTab ? {
+		details: "Editing " + activeTab.name,
+		state: activeTab.className + " · " + activeTab.root,
+	} : {
+		details: hasConnection() ? "Browsing project files" : "Waiting for private session",
+		state: hasConnection() ? "Workspace connected" : "Private compiler workspace",
+	};
+
+	const signature = JSON.stringify(payload);
+	if (signature === lastDiscordActivitySignature) return;
+	lastDiscordActivitySignature = signature;
+
+	window.forgeDesktop.setDiscordActivity(payload).catch(() => {});
+}
+
 function updateFileIndex() {
 	state.filesById = new Map();
 	for (const item of state.files) {
@@ -398,9 +418,11 @@ function updateEditorHeader() {
 		refs.fileTitle.textContent = activeTab.name + " [" + activeTab.className + "]";
 		refs.filePath.textContent = activeTab.root + "/" + activeTab.relativePath + splitText;
 		document.title = "Forge - " + activeTab.name + ".lua";
+		updateDesktopDiscordActivity(activeTab);
 		return;
 	}
 
+	updateDesktopDiscordActivity(null);
 	refs.fileTitle.textContent = "No file open";
 	refs.filePath.textContent = hasConnection()
 		? "Open a script from the Explorer."

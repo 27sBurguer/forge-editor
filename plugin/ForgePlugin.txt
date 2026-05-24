@@ -5,6 +5,9 @@ local RunService = game:GetService("RunService")
 local PLUGIN_NAME = "Forge"
 local WIDGET_ID = "Forge_MainWidget"
 
+local LOCAL_BASE_URL = "http://localhost:3000"
+local CLOUD_BASE_URL = "https://forge-editor.onrender.com"
+
 local AUTO_PULL_INTERVAL = 1
 local AUTO_UPLOAD_INTERVAL = 5
 local MAX_REQUEST_ATTEMPTS = 2
@@ -38,9 +41,10 @@ local session = {
 }
 
 local apiConfig = {
-	BaseUrl = "https://forge-editor.onrender.com",
+	BaseUrl = CLOUD_BASE_URL,
 	LastStatus = "Not connected",
 	LastStatusColor = nil,
+	ConnectionMode = "Cloud",
 }
 
 local autoSync = {
@@ -63,6 +67,7 @@ local lastAction = "Idle"
 local secretVisible = false
 local networkBusy = false
 local playPaused = false
+local resolvingBaseUrl = false
 
 local theme = {
 	Background = Color3.fromRGB(15, 15, 15),
@@ -494,6 +499,7 @@ local function getWebLoginText()
 	return table.concat({
 		"Forge Login",
 		"URL: " .. normalizeBaseUrl(apiConfig.BaseUrl),
+		"Mode: " .. tostring(apiConfig.ConnectionMode or "Unknown"),
 		"Session ID: " .. tostring(session.Id or ""),
 		"Secret: " .. tostring(session.Secret or ""),
 	}, "\n")
@@ -577,6 +583,10 @@ local function updateApiView()
 	ui.apiBaseUrlBox.Text = apiConfig.BaseUrl
 	ui.apiStatusLabel.Text = "API: " .. apiConfig.LastStatus
 	ui.apiStatusLabel.TextColor3 = apiConfig.LastStatusColor or theme.MutedText
+
+	if ui.connectionModeLabel then
+		ui.connectionModeLabel.Text = "Mode: " .. tostring(apiConfig.ConnectionMode or "Auto")
+	end
 end
 
 local function updateStatsView()
@@ -618,35 +628,37 @@ local function decodeJsonResponse(response)
 	return decodeResult, nil
 end
 
-local function requestJson(method, path, body)
-	if not canSync() then
-		return false, nil, "Forge is paused while Play Mode is running."
-	end
-
-	local baseUrl = normalizeBaseUrl(apiConfig.BaseUrl)
+local function requestJsonAtBaseUrl(baseUrl, method, path, body, withAuth, maxAttempts)
+	baseUrl = normalizeBaseUrl(baseUrl)
 
 	if baseUrl == "" then
 		return false, nil, "API Base URL is empty."
 	end
 
+	local attempts = math.max(1, tonumber(maxAttempts) or MAX_REQUEST_ATTEMPTS)
 	local lastError = nil
 	local lastDecoded = nil
 
-	for attempt = 1, MAX_REQUEST_ATTEMPTS do
+	for attempt = 1, attempts do
 		if not canSync() then
 			return false, nil, "Forge is paused while Play Mode is running."
+		end
+
+		local headers = {
+			["Content-Type"] = "application/json",
+		}
+
+		if withAuth then
+			headers["X-Forge-Session"] = session.Id or ""
+			headers["X-Forge-Secret"] = session.Secret or ""
+			headers["X-StudioBridge-Session"] = session.Id or ""
+			headers["X-StudioBridge-Secret"] = session.Secret or ""
 		end
 
 		local requestOptions = {
 			Url = baseUrl .. path,
 			Method = method,
-			Headers = {
-				["Content-Type"] = "application/json",
-				["X-Forge-Session"] = session.Id or "",
-				["X-Forge-Secret"] = session.Secret or "",
-				["X-StudioBridge-Session"] = session.Id or "",
-				["X-StudioBridge-Secret"] = session.Secret or "",
-			},
+			Headers = headers,
 		}
 
 		if body ~= nil then
@@ -658,7 +670,7 @@ local function requestJson(method, path, body)
 		end)
 
 		if not success then
-			lastError = tostring(response) .. " | " .. REQUEST_TIMEOUT_TEXT
+			lastError = tostring(response)
 		else
 			local decoded, decodeError = decodeJsonResponse(response)
 			lastDecoded = decoded
@@ -678,12 +690,101 @@ local function requestJson(method, path, body)
 			end
 		end
 
-		if attempt < MAX_REQUEST_ATTEMPTS then
+		if attempt < attempts then
 			task.wait(REQUEST_RETRY_DELAY)
 		end
 	end
 
 	return false, lastDecoded, lastError or "Request failed."
+end
+
+local function checkHealth(baseUrl)
+	local success, data, requestError = requestJsonAtBaseUrl(baseUrl, "GET", "/health", nil, false, 1)
+
+	if not success then
+		return false, nil, requestError
+	end
+
+	if typeof(data) == "table" and data.ok == true then
+		return true, data, nil
+	end
+
+	return false, data, "Invalid health response."
+end
+
+local function resolveBestBaseUrl(silent)
+	if resolvingBaseUrl then
+		return normalizeBaseUrl(apiConfig.BaseUrl) ~= ""
+	end
+
+	if not canSync() then
+		return false
+	end
+
+	resolvingBaseUrl = true
+
+	if not silent then
+		apiConfig.LastStatus = "Checking local app..."
+		apiConfig.LastStatusColor = theme.Warning
+		updateAllViews()
+	end
+
+	local localOk = checkHealth(LOCAL_BASE_URL)
+
+	if localOk then
+		apiConfig.BaseUrl = LOCAL_BASE_URL
+		apiConfig.ConnectionMode = "Local App"
+		apiConfig.LastStatus = "Connected to local app"
+		apiConfig.LastStatusColor = theme.Success
+		setLastAction("Using local Forge app")
+		resolvingBaseUrl = false
+		updateAllViews()
+		return true
+	end
+
+	if not silent then
+		apiConfig.LastStatus = "Local app not found. Checking cloud..."
+		apiConfig.LastStatusColor = theme.Warning
+		updateAllViews()
+	end
+
+	local cloudOk, cloudData, cloudError = checkHealth(CLOUD_BASE_URL)
+
+	if cloudOk then
+		apiConfig.BaseUrl = CLOUD_BASE_URL
+		apiConfig.ConnectionMode = "Cloud"
+		apiConfig.LastStatus = "Connected to cloud"
+		apiConfig.LastStatusColor = theme.Success
+		setLastAction("Using Forge cloud")
+		resolvingBaseUrl = false
+		updateAllViews()
+		return true
+	end
+
+	apiConfig.BaseUrl = CLOUD_BASE_URL
+	apiConfig.ConnectionMode = "Cloud"
+	apiConfig.LastStatus = "Connection failed: " .. tostring(cloudError or "No Forge server found")
+	apiConfig.LastStatusColor = theme.Danger
+	setLastAction("API auto-detect failed")
+	resolvingBaseUrl = false
+	updateAllViews()
+	return false
+end
+
+local function requestJson(method, path, body)
+	if not canSync() then
+		return false, nil, "Forge is paused while Play Mode is running."
+	end
+
+	if normalizeBaseUrl(apiConfig.BaseUrl) == "" then
+		local resolved = resolveBestBaseUrl(true)
+
+		if not resolved then
+			return false, nil, "Could not find a Forge API server."
+		end
+	end
+
+	return requestJsonAtBaseUrl(apiConfig.BaseUrl, method, path, body, true, MAX_REQUEST_ATTEMPTS)
 end
 
 local function getInstanceDepth(root, instance)
@@ -1452,13 +1553,12 @@ local function startAutomation()
 		return
 	end
 
-	apiConfig.BaseUrl = normalizeBaseUrl(ui.apiBaseUrlBox and ui.apiBaseUrlBox.Text or apiConfig.BaseUrl)
+	if normalizeBaseUrl(apiConfig.BaseUrl) == "" then
+		local resolved = resolveBestBaseUrl(false)
 
-	if apiConfig.BaseUrl == "" then
-		apiConfig.LastStatus = "Base URL is empty"
-		apiConfig.LastStatusColor = theme.Danger
-		updateApiView()
-		return
+		if not resolved then
+			return
+		end
 	end
 
 	autoSync.Enabled = true
@@ -1536,6 +1636,12 @@ local function createSession()
 		task.wait(0.1)
 	end
 
+	local resolved = resolveBestBaseUrl(false)
+
+	if not resolved then
+		return
+	end
+
 	secretVisible = false
 	session.Active = true
 	session.Id = generateSessionId()
@@ -1548,7 +1654,6 @@ local function createSession()
 	lastUploadedProjectHash = nil
 	lastUploadAt = nil
 	lastScanCount = 0
-	apiConfig.BaseUrl = normalizeBaseUrl(ui.apiBaseUrlBox and ui.apiBaseUrlBox.Text or apiConfig.BaseUrl)
 	setLastAction("Session created")
 	updateAllViews()
 	print("[Forge] Session created:", session.Id)
@@ -1556,7 +1661,7 @@ local function createSession()
 	local connected = requestJson("GET", "/health", nil)
 
 	if connected then
-		apiConfig.LastStatus = "Connected"
+		apiConfig.LastStatus = "Connected to " .. tostring(apiConfig.ConnectionMode or "Forge")
 		apiConfig.LastStatusColor = theme.Success
 		uploadCurrentProjectToApi(false, true)
 		startAutomation()
@@ -1863,7 +1968,7 @@ local function buildWidget()
 	playModeNote.AutoButtonColor = false
 	playModeNote.Parent = endButtons
 
-	local apiCard = createCard(root, "ApiCard", 214, 4)
+	local apiCard = createCard(root, "ApiCard", 238, 4)
 
 	local apiTitle = createLabel("Connection", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
 	apiTitle.TextSize = 15
@@ -1874,6 +1979,11 @@ local function buildWidget()
 	ui.apiStatusLabel.TextSize = 13
 	ui.apiStatusLabel.LayoutOrder = 2
 	ui.apiStatusLabel.Parent = apiCard
+
+	ui.connectionModeLabel = createLabel("Mode: Auto", UDim2.new(1, 0, 0, 20), theme.MutedText, Enum.Font.Gotham)
+	ui.connectionModeLabel.TextSize = 12
+	ui.connectionModeLabel.LayoutOrder = 3
+	ui.connectionModeLabel.Parent = apiCard
 
 	ui.apiBaseUrlBox = createInstance("TextBox", {
 		Size = UDim2.new(1, 0, 0, 34),
@@ -1886,7 +1996,7 @@ local function buildWidget()
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ClearTextOnFocus = false,
 		TextEditable = true,
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		Parent = apiCard,
 	}, {
 		createCorner(10),
@@ -1896,7 +2006,7 @@ local function buildWidget()
 	local apiButtons = createInstance("Frame", {
 		Size = UDim2.new(1, 0, 0, 32),
 		BackgroundTransparency = 1,
-		LayoutOrder = 4,
+		LayoutOrder = 5,
 		Parent = apiCard,
 	})
 
@@ -1907,7 +2017,7 @@ local function buildWidget()
 		Parent = apiButtons,
 	})
 
-	ui.testApiButton = createSmallButton("Test API", theme.PanelSoft)
+	ui.testApiButton = createSmallButton("Detect API", theme.PanelSoft)
 	ui.testApiButton.LayoutOrder = 1
 	ui.testApiButton.Parent = apiButtons
 
@@ -1916,9 +2026,9 @@ local function buildWidget()
 	ui.manualRefreshButton.LayoutOrder = 2
 	ui.manualRefreshButton.Parent = apiButtons
 
-	local hint = createLabel("Create a session, copy the Session ID and Secret, then paste them into the Forge web editor.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
+	local hint = createLabel("Forge uses localhost:3000 when the app is open. If not, it falls back to Render cloud.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
 	hint.TextSize = 12
-	hint.LayoutOrder = 5
+	hint.LayoutOrder = 6
 	hint.Parent = apiCard
 
 	local statsCard = createCard(root, "StatsCard", 164, 5)
@@ -1946,6 +2056,18 @@ local function buildWidget()
 	ui.copySecretButton.MouseButton1Click:Connect(copySecret)
 	ui.copyLoginButton.MouseButton1Click:Connect(copyLoginBlock)
 	ui.revealSecretButton.MouseButton1Click:Connect(toggleSecretVisible)
+
+	ui.apiBaseUrlBox.FocusLost:Connect(function()
+		local value = normalizeBaseUrl(ui.apiBaseUrlBox.Text)
+
+		if value ~= "" then
+			apiConfig.BaseUrl = value
+			apiConfig.ConnectionMode = value == LOCAL_BASE_URL and "Local App" or "Custom"
+			setLastAction("API URL changed manually")
+			updateAllViews()
+		end
+	end)
+
 	ui.testApiButton.MouseButton1Click:Connect(function()
 		if not canSync() then
 			playPaused = true
@@ -1954,34 +2076,19 @@ local function buildWidget()
 			return
 		end
 
-		apiConfig.BaseUrl = normalizeBaseUrl(ui.apiBaseUrlBox and ui.apiBaseUrlBox.Text or apiConfig.BaseUrl)
-		apiConfig.LastStatus = "Testing..."
-		apiConfig.LastStatusColor = theme.Warning
-		updateAllViews()
-
-		local success, data, requestError = requestJson("GET", "/health", nil)
-
-		if success then
-			local serviceName = "Forge API"
-
-			if typeof(data) == "table" and data.service then
-				serviceName = tostring(data.service)
-			end
-
-			apiConfig.LastStatus = "Connected to " .. serviceName
-			apiConfig.LastStatusColor = theme.Success
-			setLastAction("API connected")
-		else
-			apiConfig.LastStatus = requestError
-			apiConfig.LastStatusColor = theme.Danger
-			setLastAction("API connection failed")
-		end
-
-		updateAllViews()
+		resolveBestBaseUrl(false)
 	end)
+
 	ui.manualRefreshButton.MouseButton1Click:Connect(manualRefreshNow)
 
 	updateAllViews()
+
+	task.spawn(function()
+		task.wait(0.5)
+		if canSync() and not session.Active then
+			resolveBestBaseUrl(true)
+		end
+	end)
 end
 
 local function updatePlayModePause()

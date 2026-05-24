@@ -1,3 +1,21 @@
+const ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
+
+function createRobloxPluginButton() {
+	const button = document.createElement("a");
+	button.id = "desktopRobloxPluginButton";
+	button.className = "roblox-plugin-button";
+	button.href = ROBLOX_PLUGIN_URL;
+	button.target = "_blank";
+	button.rel = "noopener";
+	button.textContent = "Roblox Plugin";
+	return button;
+}
+
+function hideDesktopDownloadButton() {
+	const downloadButton = document.getElementById("downloadAppButton");
+	if (downloadButton) downloadButton.remove();
+}
+
 function createDesktopBadge(info) {
 	const badge = document.createElement("button");
 	badge.id = "desktopUpdateBadge";
@@ -27,7 +45,20 @@ function setBadgeText(text) {
 	try {
 		const info = await window.forgeDesktop.getAppInfo();
 		const actions = document.querySelector(".title-actions");
-		if (actions) actions.prepend(createDesktopBadge(info));
+		if (actions) {
+			hideDesktopDownloadButton();
+			actions.prepend(createDesktopBadge(info));
+			if (!document.getElementById("desktopRobloxPluginButton") && !document.getElementById("robloxPluginButton")) {
+				actions.insertBefore(createRobloxPluginButton(), actions.children[1] || null);
+			}
+		}
+
+		if (window.forgeDesktop.setDiscordActivity) {
+			window.forgeDesktop.setDiscordActivity({
+				details: "Building scripts with Forge",
+				state: "Private compiler workspace",
+			}).catch(() => {});
+		}
 
 		window.forgeDesktop.onUpdateStatus(payload => {
 			if (!payload) return;

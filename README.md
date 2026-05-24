@@ -1,133 +1,122 @@
 # Forge Desktop + Web
 
-Este pacote já está configurado para o repositório:
+This package is configured for:
 
 ```txt
 https://github.com/27sBurguer/forge-editor
 ```
 
-O Forge pode rodar de duas formas:
+Forge can run in two modes:
 
-1. **Site/servidor Node** usando `npm start`.
-2. **Aplicativo desktop Electron** usando `npm run desktop` ou instalador `.exe`.
+1. **Web / Node server** with `npm start`.
+2. **Desktop Electron app** with `npm run desktop` or the Windows installer.
 
-## Rodar como site
+## Run as web server
 
 ```bash
 npm install
 npm start
 ```
 
-Abra:
+Open:
 
 ```txt
 http://localhost:3000
 ```
 
-## Rodar como app desktop em desenvolvimento
+## Run as desktop app in development
 
 ```bash
 npm install
 npm run desktop
 ```
 
-O aplicativo abre uma janela própria e sobe o Forge localmente em `localhost:3000`.
+The desktop app opens its own window and starts Forge locally at `localhost:3000`.
 
-## Gerar instalador Windows localmente
+## Build the Windows installer locally
 
 ```bash
 npm install
 npm run build:win
 ```
 
-O instalador fica em:
+The installer is generated at:
 
 ```txt
 dist/Forge-Setup.exe
 ```
 
-## Publicar uma versão com auto-update
+## Publish a release with auto-update
 
-Faça commit dos arquivos e envie para o GitHub:
+Commit and push your files:
 
 ```bash
 git add .
-git commit -m "Add Forge desktop app"
+git commit -m "Update Forge desktop app"
 git push origin main
 ```
 
-Depois crie uma tag:
+Create a new tag:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
-O GitHub Actions vai gerar o instalador Windows e publicar nos Releases.
+The GitHub Action builds the Windows installer and uploads it to GitHub Releases.
 
-## Link direto do botão Baixar Forge App
+Do not keep reusing the same tag for updates. Use newer versions such as:
 
-O botão do site já aponta para:
+```txt
+v1.0.2
+v1.0.3
+v1.0.4
+```
+
+## Download button
+
+The web download button points to:
 
 ```txt
 https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.exe
 ```
 
-Depois que a primeira release existir, esse link baixa o instalador mais recente.
+The Electron app hides the desktop download button, because the user is already inside the app.
 
-## Atualizações automáticas
+## Roblox Plugin button
 
-O app usa `electron-updater` com GitHub Releases. Quando você publicar uma nova tag, por exemplo:
-
-```bash
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-O app instalado detecta a atualização e baixa automaticamente.
-
-## Plugin Roblox
-
-A pasta `plugin/` inclui `ForgePlugin.txt`, a versão segura sem roots runtime como `Players` e `NetworkClient`.
-
-Essa versão pausa durante Play Mode para evitar conflitos enquanto o jogo está rodando.
-
-
-## Desktop release notes
-
-This package is already configured for:
-
-- GitHub owner: `27sBurguer`
-- Repository: `forge-editor`
-- Windows installer artifact: `Forge-Setup.exe`
-- App icon: `public/assets/forge-icon.ico`
-- Auto-update through GitHub Releases
-
-The release workflow intentionally does not use npm cache, so it does not require `package-lock.json`.
-
-To publish a new Windows installer:
-
-```bash
-git add .
-git commit -m "Update Forge desktop build"
-git push origin main
-
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-If the tag already exists from a failed run:
-
-```bash
-git tag -d v1.0.0
-git push origin :refs/tags/v1.0.0
-
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-After the Action finishes, the download button points to:
+The title bar includes a Roblox Plugin button pointing to:
 
 ```txt
-https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.exe
+https://create.roblox.com/store/asset/110405258188669/Forge-Codex
 ```
+
+## Discord Rich Presence
+
+The desktop app uses Discord Rich Presence with:
+
+```txt
+Application ID: 1507948057289822229
+Large Image Key: forge_logo
+```
+
+The activity updates when the user opens or switches scripts. Discord must be open on the user's computer for Rich Presence to appear.
+
+## Auto-updates
+
+The app uses `electron-updater` with GitHub Releases. When you publish a newer tag, the installed app can detect and download the update automatically.
+
+## Roblox Studio plugin
+
+The `plugin/` folder includes `ForgePlugin.txt`.
+
+The plugin automatically detects the best API target:
+
+```txt
+1. http://localhost:3000
+2. https://forge-editor.onrender.com
+```
+
+So if the Forge Desktop App is open, the plugin uses the local app. If not, it falls back to Render cloud.
+
+The plugin also pauses during Roblox Studio Play Mode to avoid runtime conflicts.

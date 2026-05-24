@@ -1,20 +1,23 @@
 {
 	"name": "forge-editor",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"description": "Forge - professional Roblox script compiler and private desktop editor.",
 	"private": true,
 	"main": "electron/main.js",
 	"author": "27sBurguer",
 	"license": "UNLICENSED",
 	"scripts": {
-	"start": "node server.js",
-	"desktop": "electron .",
-	"build:win": "electron-builder --win nsis --publish never",
-	"release": "electron-builder --win nsis --publish always",
-	"release:win": "electron-builder --win nsis --publish always"
+		"start": "node server.js",
+		"desktop": "electron .",
+		"dev:app": "electron .",
+		"build:win": "electron-builder --win nsis --publish never",
+		"build:app": "electron-builder",
+		"release": "electron-builder --win nsis --publish always",
+		"release:win": "electron-builder --win nsis --publish always"
 	},
 	"dependencies": {
-		"electron-updater": "^6.3.9"
+		"electron-updater": "^6.3.9",
+		"discord-rpc": "^4.0.1"
 	},
 	"devDependencies": {
 		"electron": "^39.0.0",

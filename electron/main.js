@@ -3,16 +3,100 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { startServer } = require("../server");
 
+let DiscordRPC = null;
+try {
+	DiscordRPC = require("discord-rpc");
+} catch (error) {
+	DiscordRPC = null;
+}
+
 const APP_PORT = Number(process.env.FORGE_PORT || 3000);
 const APP_HOST = "127.0.0.1";
 const APP_ICON_PATH = path.join(__dirname, "..", "public", "assets", "forge-icon.png");
+const DISCORD_CLIENT_ID = "1507948057289822229";
+const DISCORD_LARGE_IMAGE_KEY = "forge_logo";
+const FORGE_WEB_URL = "https://forge-editor.onrender.com";
+const FORGE_DOWNLOAD_URL = "https://github.com/27sBurguer/forge-editor/releases/latest";
+const activityStartedAt = new Date();
 
 let mainWindow = null;
 let serverHandle = null;
 let isQuitting = false;
+let discordClient = null;
+let discordReady = false;
+let queuedDiscordActivity = null;
+let lastDiscordSignature = "";
 
 function getAppUrl() {
 	return `http://${APP_HOST}:${APP_PORT}`;
+}
+
+
+function sanitizePresenceText(value, fallback, maxLength = 128) {
+	const text = String(value || fallback || "Forge").replace(/\s+/g, " ").trim();
+	return text.length > maxLength ? text.slice(0, maxLength - 1) + "…" : text;
+}
+
+function buildDiscordActivity(payload = {}) {
+	return {
+		details: sanitizePresenceText(payload.details, "Editing scripts with Forge"),
+		state: sanitizePresenceText(payload.state, "Private compiler workspace"),
+		largeImageKey: DISCORD_LARGE_IMAGE_KEY,
+		largeImageText: "Forge",
+		startTimestamp: activityStartedAt,
+		instance: false,
+		buttons: [
+			{ label: "Open Forge", url: FORGE_WEB_URL },
+			{ label: "Download App", url: FORGE_DOWNLOAD_URL },
+		],
+	};
+}
+
+async function setDiscordPresence(payload = {}) {
+	queuedDiscordActivity = payload;
+
+	if (!discordClient || !discordReady) {
+		return { ok: false, queued: true };
+	}
+
+	const activity = buildDiscordActivity(payload);
+	const signature = JSON.stringify(activity);
+
+	if (signature === lastDiscordSignature) {
+		return { ok: true, skipped: true };
+	}
+
+	lastDiscordSignature = signature;
+
+	try {
+		await discordClient.setActivity(activity);
+		return { ok: true };
+	} catch (error) {
+		return { ok: false, error: error && error.message ? error.message : String(error) };
+	}
+}
+
+function initializeDiscordPresence() {
+	if (!DiscordRPC) return;
+
+	try {
+		DiscordRPC.register(DISCORD_CLIENT_ID);
+		discordClient = new DiscordRPC.Client({ transport: "ipc" });
+
+		discordClient.on("ready", () => {
+			discordReady = true;
+			setDiscordPresence(queuedDiscordActivity || {
+				details: "Building scripts with Forge",
+				state: "Private compiler workspace",
+			}).catch(() => {});
+		});
+
+		discordClient.login({ clientId: DISCORD_CLIENT_ID }).catch(() => {
+			discordReady = false;
+		});
+	} catch (error) {
+		discordReady = false;
+	}
 }
 
 function configureAutoUpdater() {
@@ -149,6 +233,7 @@ async function boot() {
 		}
 	}
 
+	initializeDiscordPresence();
 	configureAutoUpdater();
 	await createWindow();
 }
@@ -173,6 +258,10 @@ ipcMain.handle("forge:check-for-updates", async () => {
 	}
 });
 
+ipcMain.handle("forge:set-discord-activity", async (_event, activity) => {
+	return setDiscordPresence(activity || {});
+});
+
 app.setAppUserModelId("com.forge.editor");
 
 app.whenReady().then(boot);
@@ -189,6 +278,10 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
 	isQuitting = true;
+	if (discordClient && discordReady) {
+		try { discordClient.clearActivity(); } catch (error) {}
+	}
+
 	if (serverHandle && serverHandle.server) {
 		try { serverHandle.server.close(); } catch (error) {}
 	}
