@@ -122,3 +122,10 @@ The plugin automatically detects the best API target:
 So if the Forge Desktop App is open, the plugin uses the local app. If not, it falls back to Render cloud.
 
 The plugin also pauses during Roblox Studio Play Mode to avoid runtime conflicts.
+
+
+## Release note
+
+This package is set to version `1.0.5`. Build releases with matching tags such as `v1.0.5`; the app updater reads the packaged app version and the GitHub release metadata.
+
+Shortcuts added: `Ctrl+1` through `Ctrl+9` switch to open tabs by order.

@@ -1,6 +1,6 @@
 {
 	"name": "forge-editor",
-	"version": "1.0.2",
+	"version": "1.0.5",
 	"description": "Forge - professional Roblox script compiler and private desktop editor.",
 	"private": true,
 	"main": "electron/main.js",

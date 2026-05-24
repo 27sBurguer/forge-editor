@@ -1053,9 +1053,12 @@ select:focus {
 }
 
 @media (max-width: 980px) {
-	.download-app-button,
 	.roblox-plugin-button,
 	.desktop-update-badge {
 		display: none;
+	}
+
+	.download-app-button {
+		display: inline-flex;
 	}
 }

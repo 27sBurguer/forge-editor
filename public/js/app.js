@@ -498,12 +498,44 @@ function expandExplorer() {
 	setStatus("Explorer expanded.", "success");
 }
 
+function switchTabByShortcutIndex(index) {
+	const tabIds = Array.from(state.openTabs.keys());
+	const fileId = tabIds[index - 1];
+
+	if (!fileId) {
+		showToast("No tab exists in slot " + index + ".", "warning");
+		return false;
+	}
+
+	switchTab(fileId, state.activeGroup || "primary");
+	return true;
+}
+
 function handleGlobalShortcut(event) {
 	const key = String(event.key || "").toLowerCase();
 	const code = event.code || "";
 	const mod = event.ctrlKey || event.metaKey;
 
 	if (!mod) return false;
+
+	if (!event.shiftKey && !event.altKey) {
+		let tabIndex = 0;
+
+		if (/^[1-9]$/.test(key)) {
+			tabIndex = Number(key);
+		} else if (/^Digit[1-9]$/.test(code)) {
+			tabIndex = Number(code.slice(5));
+		} else if (/^Numpad[1-9]$/.test(code)) {
+			tabIndex = Number(code.slice(6));
+		}
+
+		if (tabIndex >= 1 && tabIndex <= 9) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+			return switchTabByShortcutIndex(tabIndex);
+		}
+	}
 
 	if (key === "w" || code === "KeyW") {
 		const fileId = getClosableFileId();
@@ -1936,7 +1968,7 @@ function bootEditor() {
 		onFallbackKeyDown: handleEditorKeys,
 		onCursor(position, group) {
 			state.activeGroup = group || state.activeGroup;
-			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+W close tab · Ctrl+Shift+E fold · Ctrl+E unfold";
+			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+1-9 tabs · Ctrl+W close tab · Ctrl+Shift+E fold · Ctrl+E unfold";
 			updateEditorHeader();
 		},
 		onActiveGroup: setActiveGroup,
