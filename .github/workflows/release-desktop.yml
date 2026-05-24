@@ -1,4 +1,4 @@
-name: Release Forge Desktop
+name: Release Cloud Desktop
 
 on:
   push:

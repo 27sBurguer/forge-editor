@@ -24,7 +24,7 @@ function createDesktopBadge(info) {
 	badge.className = "desktop-update-badge";
 	badge.type = "button";
 	badge.textContent = `App v${info.version}`;
-	badge.title = "Check for Forge app updates";
+	badge.title = "Check for Cloud app updates";
 	badge.addEventListener("click", async () => {
 		badge.textContent = "Checking update...";
 		const result = await window.forgeDesktop.checkForUpdates();
@@ -59,7 +59,7 @@ function setBadgeText(text) {
 
 		if (window.forgeDesktop.setDiscordActivity) {
 			window.forgeDesktop.setDiscordActivity({
-				details: "Using Forge",
+				details: "Using Cloud",
 				state: "Private IDE workspace",
 			}).catch(() => {});
 		}

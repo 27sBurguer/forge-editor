@@ -124,7 +124,7 @@ async function handleSessionUpload(req, res) {
 	};
 
 	setSession(headers.sessionId, sessionData);
-	console.log("[Forge API] Session uploaded:", headers.sessionId, "Items:", uploadedFiles.length);
+	console.log("[Cloud API] Session uploaded:", headers.sessionId, "Items:", uploadedFiles.length);
 	sendJson(res, 200, {
 		ok: true,
 		sessionId: headers.sessionId,
@@ -202,7 +202,7 @@ async function createItem(req, res, sessionId) {
 		sourceHash: item.sourceHash,
 	});
 
-	console.log("[Forge API] Item created:", `${root}/${item.relativePath}`, "Revision:", change.revision);
+	console.log("[Cloud API] Item created:", `${root}/${item.relativePath}`, "Revision:", change.revision);
 	sendJson(res, 200, { ok: true, sessionId, item: getPublicFiles([item])[0], revision: change.revision });
 }
 
@@ -285,7 +285,7 @@ async function saveSource(req, res, sessionId, fileId) {
 		sourceHash: file.sourceHash,
 	});
 
-	console.log("[Forge API] Source saved:", `${file.root}/${file.relativePath}`, "Revision:", change.revision);
+	console.log("[Cloud API] Source saved:", `${file.root}/${file.relativePath}`, "Revision:", change.revision);
 	sendJson(res, 200, {
 		ok: true,
 		sessionId,
@@ -365,7 +365,7 @@ async function moveItem(req, res, sessionId, fileId) {
 		parentItemId,
 	});
 
-	console.log("[Forge API] Item moved:", `${oldRoot}/${oldPath}`, "=>", `${targetRoot}/${newRelativePath}`, "Revision:", change.revision);
+	console.log("[Cloud API] Item moved:", `${oldRoot}/${oldPath}`, "=>", `${targetRoot}/${newRelativePath}`, "Revision:", change.revision);
 	sendJson(res, 200, {
 		ok: true,
 		sessionId,
@@ -398,7 +398,7 @@ async function deleteItem(req, res, sessionId, fileId) {
 		removed: getPublicFiles(removed),
 	});
 
-	console.log("[Forge API] Item deleted:", `${item.root}/${item.relativePath}`, "Revision:", change.revision);
+	console.log("[Cloud API] Item deleted:", `${item.root}/${item.relativePath}`, "Revision:", change.revision);
 	sendJson(res, 200, { ok: true, sessionId, removed: getPublicFiles(removed), revision: change.revision });
 }
 
@@ -438,7 +438,7 @@ async function handleRequest(req, res) {
 		const url = new URL(req.url, "http://localhost");
 
 		if (req.method === "GET" && url.pathname === "/health") {
-			sendJson(res, 200, { ok: true, service: "Forge API", version: "2.2.0-pro", time: Date.now() });
+			sendJson(res, 200, { ok: true, service: "Cloud API", version: "2.3.0", time: Date.now() });
 			return;
 		}
 

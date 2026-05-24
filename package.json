@@ -1,7 +1,7 @@
 {
-	"name": "forge-editor",
-	"version": "1.0.9",
-	"description": "Forge - a complete integrated development environment for Roblox.",
+	"name": "cloud-ide",
+	"version": "1.1.0",
+	"description": "Cloud - a complete integrated development environment for Roblox.",
 	"private": true,
 	"main": "electron/main.js",
 	"author": "27sBurguer",
@@ -25,7 +25,7 @@
 	},
 	"build": {
 		"appId": "com.forge.editor",
-		"productName": "Forge",
+		"productName": "Cloud",
 		"asar": true,
 		"directories": {
 			"output": "dist"
@@ -38,7 +38,10 @@
 			"package.json",
 			"public/assets/forge-icon.ico",
 			"public/assets/forge-icon.png",
-			"public/assets/forge-logo.png"
+			"public/assets/forge-logo.png",
+			"public/assets/cloud-icon.ico",
+			"public/assets/cloud-icon.png",
+			"public/assets/cloud-logo.png"
 		],
 		"publish": [
 			{
@@ -57,8 +60,8 @@
 					]
 				}
 			],
-			"artifactName": "Forge-Setup.${ext}",
-			"icon": "public/assets/forge-icon.ico"
+			"artifactName": "Cloud-Setup.${ext}",
+			"icon": "public/assets/cloud-icon.ico"
 		},
 		"nsis": {
 			"oneClick": false,
@@ -67,10 +70,10 @@
 			"allowToChangeInstallationDirectory": true,
 			"createDesktopShortcut": true,
 			"createStartMenuShortcut": true,
-			"shortcutName": "Forge",
-			"installerIcon": "public/assets/forge-icon.ico",
-			"uninstallerIcon": "public/assets/forge-icon.ico",
-			"installerHeaderIcon": "public/assets/forge-icon.ico"
+			"shortcutName": "Cloud",
+			"installerIcon": "public/assets/cloud-icon.ico",
+			"uninstallerIcon": "public/assets/cloud-icon.ico",
+			"installerHeaderIcon": "public/assets/cloud-icon.ico"
 		},
 		"mac": {
 			"target": [

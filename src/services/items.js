@@ -126,7 +126,7 @@ function assertValidParent(sessionData, root, parentRelativePath, parentItemId) 
 	const parent = getParentItem(sessionData, root, parentRelativePath, parentItemId);
 
 	if (!parent) {
-		return { ok: false, error: "Parent instance does not exist in the current Forge tree." };
+		return { ok: false, error: "Parent instance does not exist in the current Cloud tree." };
 	}
 
 	return { ok: true, parent };

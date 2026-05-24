@@ -97,6 +97,8 @@ const refs = {
 	settingsModal: document.getElementById("settingsModal"),
 	closeSettingsButton: document.getElementById("closeSettingsButton"),
 	languageInput: document.getElementById("languageInput"),
+	appearanceInput: document.getElementById("appearanceInput"),
+	gateAppearanceSelect: document.getElementById("gateAppearanceSelect"),
 	fontFamilyInput: document.getElementById("fontFamilyInput"),
 	fontSizeInput: document.getElementById("fontSizeInput"),
 	autosaveInput: document.getElementById("autosaveInput"),
@@ -169,6 +171,18 @@ function hasConnection() {
 
 function tx(key) {
 	return t(state.language, key);
+}
+
+function normalizeInterfaceTheme(value) {
+	return ["system", "dark", "light"].includes(value) ? value : "system";
+}
+
+function applyInterfaceTheme(value) {
+	const theme = normalizeInterfaceTheme(value);
+	document.documentElement.dataset.interfaceTheme = theme;
+	if (refs.gateAppearanceSelect) refs.gateAppearanceSelect.value = theme;
+	if (refs.appearanceInput) refs.appearanceInput.value = theme;
+	return theme;
 }
 
 function getWorkspaceStorageKey() {
@@ -485,7 +499,7 @@ function updateEditorHeader() {
 		const splitText = state.secondaryFileId ? " · Split active: " + state.activeGroup : "";
 		refs.fileTitle.textContent = activeTab.name + " [" + activeTab.className + "]";
 		refs.filePath.textContent = activeTab.root + "/" + activeTab.relativePath + splitText;
-		document.title = "Forge - " + activeTab.name + ".lua";
+		document.title = "Cloud - " + activeTab.name + ".lua";
 		updateDesktopDiscordActivity(activeTab);
 		return;
 	}
@@ -495,7 +509,7 @@ function updateEditorHeader() {
 	refs.filePath.textContent = hasConnection()
 		? "Open a script from the Explorer."
 		: tx("filePathEmpty");
-	document.title = "Forge";
+	document.title = "Cloud";
 }
 
 function renderTree() {
@@ -789,7 +803,7 @@ function renderNode(parent, node, depth, query) {
 		row.addEventListener("dragstart", event => {
 			event.stopPropagation();
 			state.draggingItemId = node.item.fileId;
-			event.dataTransfer.setData("text/forge-item", node.item.fileId);
+			event.dataTransfer.setData("text/cloud-item", node.item.fileId);
 			event.dataTransfer.setData("text/plain", node.item.fileId);
 			event.dataTransfer.effectAllowed = "move";
 		});
@@ -799,7 +813,7 @@ function renderNode(parent, node, depth, query) {
 	}
 
 	row.addEventListener("dragover", event => {
-		const draggedId = state.draggingItemId || event.dataTransfer.getData("text/forge-item") || event.dataTransfer.getData("text/plain");
+		const draggedId = state.draggingItemId || event.dataTransfer.getData("text/cloud-item") || event.dataTransfer.getData("text/plain");
 		const dragged = getLoadedFile(draggedId);
 		const target = getParentPayload(node);
 
@@ -815,7 +829,7 @@ function renderNode(parent, node, depth, query) {
 		event.stopPropagation();
 		row.classList.remove("drag-over");
 
-		const draggedId = state.draggingItemId || event.dataTransfer.getData("text/forge-item") || event.dataTransfer.getData("text/plain");
+		const draggedId = state.draggingItemId || event.dataTransfer.getData("text/cloud-item") || event.dataTransfer.getData("text/plain");
 		state.draggingItemId = "";
 		moveItem(draggedId, getParentPayload(node));
 	});
@@ -915,7 +929,7 @@ function renderTabs() {
 		item.addEventListener("dragstart", event => {
 			state.draggingTabId = tab.fileId;
 			refs.tabsEl.classList.add("dragging-tabs");
-			event.dataTransfer.setData("text/forge-tab", tab.fileId);
+			event.dataTransfer.setData("text/cloud-tab", tab.fileId);
 			event.dataTransfer.effectAllowed = "move";
 			item.classList.add("dragging");
 		});
@@ -925,7 +939,7 @@ function renderTabs() {
 			item.classList.remove("dragging", "drag-over-left", "drag-over-right");
 		});
 		item.addEventListener("dragover", event => {
-			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/forge-tab");
+			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
 			if (!sourceId || sourceId === tab.fileId || !state.openTabs.has(sourceId)) return;
 
 			event.preventDefault();
@@ -937,7 +951,7 @@ function renderTabs() {
 			item.classList.toggle("drag-over-right", placeAfter);
 		});
 		item.addEventListener("dragenter", event => {
-			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/forge-tab");
+			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
 			if (!sourceId || sourceId === tab.fileId || !state.openTabs.has(sourceId)) return;
 			event.preventDefault();
 		});
@@ -947,7 +961,7 @@ function renderTabs() {
 		item.addEventListener("drop", event => {
 			event.preventDefault();
 			item.classList.remove("drag-over-left", "drag-over-right");
-			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/forge-tab");
+			const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
 			state.draggingTabId = "";
 			refs.tabsEl.classList.remove("dragging-tabs");
 
@@ -971,8 +985,12 @@ function switchTab(fileId, group = "primary") {
 	if (!tab) return;
 
 	const targetGroup = group === "secondary" ? "secondary" : "primary";
-	saveEditorViewForGroup(targetGroup);
-	state.suppressViewStateSaveUntil = Date.now() + 650;
+	const previousFileId = getActiveFileId(targetGroup);
+	if (previousFileId && previousFileId !== fileId) {
+		saveEditorViewForGroup(targetGroup);
+	}
+
+	state.suppressViewStateSaveUntil = Date.now() + 220;
 
 	if (targetGroup === "secondary") {
 		state.secondaryFileId = fileId;
@@ -990,17 +1008,16 @@ function switchTab(fileId, group = "primary") {
 		label: tab.root + "/" + tab.relativePath,
 	};
 
-	state.editor.setValue(tab.source, state.activeGroup);
-	restoreEditorViewForTab(tab, state.activeGroup);
+	state.editor.setValue(tab.source, targetGroup);
+	restoreEditorViewForTab(tab, targetGroup);
 	renderTabs();
 	renderTree();
 	updateEditorHeader();
-	setTimeout(() => state.editor.focus(state.activeGroup), 0);
+	setTimeout(() => state.editor.focus(targetGroup), 0);
 	setTimeout(() => {
 		state.suppressViewStateSaveUntil = 0;
-		saveEditorViewForGroup(state.activeGroup);
 		saveWorkspaceState(false);
-	}, 700);
+	}, 260);
 }
 
 function splitTab(fileId = state.currentFileId) {
@@ -1154,7 +1171,7 @@ async function saveCurrentFile(silent = false, fileId = getActiveFileId()) {
 		renderTabs();
 		updateEditorHeader();
 		await loadSessionFiles(false);
-		setStatus("Saved revision " + data.revision + ". Forge will apply it automatically.", "success");
+		setStatus("Saved revision " + data.revision + ". Cloud will apply it automatically.", "success");
 		if (!silent) showToast("Saved " + tab.name + ".", "success");
 	} catch (error) {
 		setStatus(error.message, "error");
@@ -1729,11 +1746,12 @@ async function deleteSelectedItem() {
 
 function openSettings() {
 	populateLanguageSelect(refs.languageInput, state.language);
+	applyInterfaceTheme(state.settings.interfaceTheme || DEFAULT_SETTINGS.interfaceTheme);
 	refs.fontFamilyInput.value = state.settings.fontFamily;
 	refs.fontSizeInput.value = state.settings.fontSize;
 	refs.autosaveInput.value = state.settings.autosaveMs;
 	refs.wordWrapInput.value = state.settings.wordWrap;
-	refs.editorThemeInput.value = state.settings.editorTheme || "forge-dark";
+	refs.editorThemeInput.value = state.settings.editorTheme || "cloud-dark";
 	refs.minimapInput.checked = !!state.settings.minimap;
 	refs.settingsModal.classList.add("open");
 	updateSettingsPreview();
@@ -1748,11 +1766,12 @@ function applySettings() {
 	populateLanguageSelect(refs.betaLanguageSelect, state.language);
 	updateEditorHeader();
 	state.settings = {
+		interfaceTheme: applyInterfaceTheme(refs.appearanceInput ? refs.appearanceInput.value : state.settings.interfaceTheme),
 		fontFamily: refs.fontFamilyInput.value.trim() || DEFAULT_SETTINGS.fontFamily,
 		fontSize: clamp(Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize, 10, 28),
 		autosaveMs: clamp(Number(refs.autosaveInput.value) || DEFAULT_SETTINGS.autosaveMs, 1000, 15000),
 		wordWrap: refs.wordWrapInput.value === "on" ? "on" : "off",
-		editorTheme: refs.editorThemeInput.value || "forge-dark",
+		editorTheme: refs.editorThemeInput.value || "cloud-dark",
 		minimap: !!refs.minimapInput.checked,
 	};
 
@@ -1765,6 +1784,7 @@ function applySettings() {
 function resetSettings() {
 	state.settings = { ...DEFAULT_SETTINGS };
 	saveJson(STORAGE.settings, state.settings);
+	applyInterfaceTheme(state.settings.interfaceTheme);
 	state.editor.applySettings(state.settings);
 	openSettings();
 }
@@ -1982,20 +2002,21 @@ function bindEvents() {
 		if (event.key === "Enter") runProjectSearch();
 		if (event.key === "Escape") closeProjectSearch();
 	});
-	for (const input of [refs.languageInput, refs.fontFamilyInput, refs.fontSizeInput, refs.autosaveInput, refs.wordWrapInput, refs.editorThemeInput, refs.minimapInput]) {
+	for (const input of [refs.languageInput, refs.appearanceInput, refs.fontFamilyInput, refs.fontSizeInput, refs.autosaveInput, refs.wordWrapInput, refs.editorThemeInput, refs.minimapInput]) {
+		if (!input) continue;
 		input.addEventListener("input", updateSettingsPreview);
 		input.addEventListener("change", updateSettingsPreview);
 	}
 	refs.searchInput.addEventListener("input", renderTree);
 	refs.editorShell.addEventListener("dragover", event => {
-		const sourceId = state.draggingTabId || event.dataTransfer.getData("text/forge-tab");
+		const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
 		if (!sourceId || !state.openTabs.has(sourceId)) return;
 		event.preventDefault();
 		refs.splitDropHint.classList.add("visible");
 	});
 	refs.editorShell.addEventListener("dragleave", () => refs.splitDropHint.classList.remove("visible"));
 	refs.editorShell.addEventListener("drop", event => {
-		const sourceId = state.draggingTabId || event.dataTransfer.getData("text/forge-tab");
+		const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
 		refs.splitDropHint.classList.remove("visible");
 		if (!sourceId || !state.openTabs.has(sourceId)) return;
 		event.preventDefault();
@@ -2037,6 +2058,18 @@ function bindEvents() {
 			state.language = applyLanguage(refs.betaLanguageSelect.value);
 			populateLanguageSelect(refs.languageInput, state.language);
 			updateEditorHeader();
+		});
+	}
+	if (refs.appearanceInput) {
+		refs.appearanceInput.addEventListener("change", () => {
+			state.settings.interfaceTheme = applyInterfaceTheme(refs.appearanceInput.value);
+			saveJson(STORAGE.settings, state.settings);
+		});
+	}
+	if (refs.gateAppearanceSelect) {
+		refs.gateAppearanceSelect.addEventListener("change", () => {
+			state.settings.interfaceTheme = applyInterfaceTheme(refs.gateAppearanceSelect.value);
+			saveJson(STORAGE.settings, state.settings);
 		});
 	}
 	if (refs.betaContinueButton) refs.betaContinueButton.addEventListener("click", closeBetaWarning);
@@ -2128,6 +2161,7 @@ function boot() {
 	state.sessionId = savedSession;
 	state.secret = savedSecret;
 
+	applyInterfaceTheme(state.settings.interfaceTheme || DEFAULT_SETTINGS.interfaceTheme);
 	setupResizer();
 	bootEditor();
 	bindEvents();

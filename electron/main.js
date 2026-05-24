@@ -12,9 +12,9 @@ try {
 
 const APP_PORT = Number(process.env.FORGE_PORT || 3000);
 const APP_HOST = "127.0.0.1";
-const APP_ICON_PATH = path.join(__dirname, "..", "public", "assets", "forge-icon.png");
+const APP_ICON_PATH = path.join(__dirname, "..", "public", "assets", "cloud-icon.png");
 const DISCORD_CLIENT_ID = "1507948057289822229";
-const DISCORD_LARGE_IMAGE_KEY = "forge_logo";
+const DISCORD_LARGE_IMAGE_KEY = "cloud_logo";
 const FORGE_WEB_URL = "https://forge-editor.onrender.com";
 const FORGE_DOWNLOAD_URL = "https://github.com/27sBurguer/forge-editor/releases/latest";
 const ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
@@ -34,20 +34,20 @@ function getAppUrl() {
 
 
 function sanitizePresenceText(value, fallback, maxLength = 128) {
-	const text = String(value || fallback || "Forge").replace(/\s+/g, " ").trim();
+	const text = String(value || fallback || "Cloud").replace(/\s+/g, " ").trim();
 	return text.length > maxLength ? text.slice(0, maxLength - 1) + "…" : text;
 }
 
 function buildDiscordActivity(payload = {}) {
 	return {
-		details: sanitizePresenceText(payload.details, "Using Forge"),
+		details: sanitizePresenceText(payload.details, "Using Cloud"),
 		state: sanitizePresenceText(payload.state, "Private IDE workspace"),
 		largeImageKey: DISCORD_LARGE_IMAGE_KEY,
-		largeImageText: "Forge",
+		largeImageText: "Cloud",
 		startTimestamp: activityStartedAt,
 		instance: false,
 		buttons: [
-			{ label: "Open Forge", url: FORGE_WEB_URL },
+			{ label: "Open Cloud", url: FORGE_WEB_URL },
 			{ label: "Plugin", url: ROBLOX_PLUGIN_URL },
 		],
 	};
@@ -87,7 +87,7 @@ function initializeDiscordPresence() {
 		discordClient.on("ready", () => {
 			discordReady = true;
 			setDiscordPresence(queuedDiscordActivity || {
-				details: "Using Forge",
+				details: "Using Cloud",
 				state: "Private IDE workspace",
 			}).catch(() => {});
 		});
@@ -135,9 +135,9 @@ function configureAutoUpdater() {
 
 		const result = await dialog.showMessageBox(mainWindow, {
 			type: "info",
-			title: "Forge update ready",
-			message: `Forge ${info.version || "update"} is ready to install.`,
-			detail: "Restart Forge now to finish the update.",
+			title: "Cloud update ready",
+			message: `Cloud ${info.version || "update"} is ready to install.`,
+			detail: "Restart Cloud now to finish the update.",
 			buttons: ["Restart now", "Later"],
 			defaultId: 0,
 			cancelId: 1,
@@ -158,7 +158,7 @@ async function createWindow() {
 		minHeight: 620,
 		show: false,
 		backgroundColor: "#0f0f0f",
-		title: "Forge",
+		title: "Cloud",
 		icon: APP_ICON_PATH,
 		autoHideMenuBar: true,
 		webPreferences: {
@@ -205,9 +205,9 @@ async function boot() {
 		if (error && error.code === "EADDRINUSE") {
 			const result = await dialog.showMessageBox({
 				type: "warning",
-				title: "Forge is already running",
+				title: "Cloud is already running",
 				message: "Port 3000 is already in use.",
-				detail: "If Forge is already open, this app will connect to it. If another program is using port 3000, close it and open Forge again.",
+				detail: "If Cloud is already open, this app will connect to it. If another program is using port 3000, close it and open Cloud again.",
 				buttons: ["Open anyway", "Quit"],
 				defaultId: 0,
 				cancelId: 1,
@@ -220,8 +220,8 @@ async function boot() {
 		} else {
 			await dialog.showMessageBox({
 				type: "error",
-				title: "Forge failed to start",
-				message: "Could not start the local Forge server.",
+				title: "Cloud failed to start",
+				message: "Could not start the local Cloud server.",
 				detail: error && error.message ? error.message : String(error),
 			});
 			app.quit();

@@ -1,4 +1,4 @@
-# Forge Desktop + Web
+# Cloud Desktop + Web
 
 This package is configured for:
 
@@ -6,7 +6,7 @@ This package is configured for:
 https://github.com/27sBurguer/forge-editor
 ```
 
-Forge can run in two modes:
+Cloud can run in two modes:
 
 1. **Web / Node server** with `npm start`.
 2. **Desktop Electron app** with `npm run desktop` or the Windows installer.
@@ -31,7 +31,7 @@ npm install
 npm run desktop
 ```
 
-The desktop app opens its own window and starts Forge locally at `localhost:3000`.
+The desktop app opens its own window and starts Cloud locally at `localhost:3000`.
 
 ## Build the Windows installer locally
 
@@ -43,7 +43,7 @@ npm run build:win
 The installer is generated at:
 
 ```txt
-dist/Forge-Setup.exe
+dist/Cloud-Setup.exe
 ```
 
 ## Publish a release with auto-update
@@ -52,7 +52,7 @@ Commit and push your files:
 
 ```bash
 git add .
-git commit -m "Update Forge desktop app"
+git commit -m "Update Cloud desktop app"
 git push origin main
 ```
 
@@ -78,7 +78,7 @@ v1.0.4
 The web download button points to:
 
 ```txt
-https://github.com/27sBurguer/forge-editor/releases/latest/download/Forge-Setup.exe
+https://github.com/27sBurguer/forge-editor/releases/latest/download/Cloud-Setup.exe
 ```
 
 The Electron app hides the desktop download button, because the user is already inside the app.
@@ -97,12 +97,12 @@ The desktop app uses Discord Rich Presence with:
 
 ```txt
 Application ID: 1507948057289822229
-Large Image Key: forge_logo
+Large Image Key: cloud_logo
 ```
 
 The activity updates when the user opens or switches scripts. Discord must be open on the user's computer for Rich Presence to appear.
 
-The Discord buttons are `Open Forge` and `Plugin`.
+The Discord buttons are `Open Cloud` and `Plugin`.
 
 ## Auto-updates
 
@@ -110,7 +110,7 @@ The app uses `electron-updater` with GitHub Releases. When you publish a newer t
 
 ## Plugin
 
-The `plugin/` folder includes `ForgePlugin.txt`.
+The `plugin/` folder includes `CloudPlugin.txt`.
 
 The plugin automatically detects the best API target:
 
@@ -119,7 +119,7 @@ The plugin automatically detects the best API target:
 2. https://forge-editor.onrender.com
 ```
 
-So if the Forge Desktop App is open, the plugin uses the local app. If not, it falls back to Render cloud.
+So if the Cloud Desktop App is open, the plugin uses the local app. If not, it falls back to Render cloud.
 
 The plugin also pauses during Play Mode to avoid runtime conflicts.
 

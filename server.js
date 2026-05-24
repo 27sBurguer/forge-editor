@@ -29,11 +29,11 @@ function startServer(options = {}) {
 if (require.main === module) {
 	startServer({ port: DEFAULT_PORT, host: "0.0.0.0" })
 		.then(({ port }) => {
-			console.log("[Forge API] Running on port " + port);
-			console.log("[Forge UI] http://localhost:" + port);
+			console.log("[Cloud API] Running on port " + port);
+			console.log("[Cloud UI] http://localhost:" + port);
 		})
 		.catch(error => {
-			console.error("[Forge API] Failed to start:", error.message || error);
+			console.error("[Cloud API] Failed to start:", error.message || error);
 			process.exitCode = 1;
 		});
 }

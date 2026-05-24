@@ -1,0 +1,2139 @@
+local HttpService = game:GetService("HttpService")
+local ScriptEditorService = game:GetService("ScriptEditorService")
+local RunService = game:GetService("RunService")
+
+local PLUGIN_NAME = "Cloud"
+local WIDGET_ID = "Cloud_MainWidget"
+
+local LOCAL_BASE_URL = "http://localhost:3000"
+local CLOUD_BASE_URL = "https://forge-editor.onrender.com"
+
+local AUTO_PULL_INTERVAL = 1
+local AUTO_UPLOAD_INTERVAL = 5
+local MAX_REQUEST_ATTEMPTS = 2
+local REQUEST_RETRY_DELAY = 0.35
+local REQUEST_TIMEOUT_TEXT = "Check if the Cloud server is running and reachable."
+local ITEM_ID_ATTRIBUTE = "ForgeItemId"
+local LEGACY_ITEM_ID_ATTRIBUTE = "StudioBridgeItemId"
+local SECRET_HIDDEN_TEXT = "Hidden - click Copy Secret"
+
+local toolbar = plugin:CreateToolbar(PLUGIN_NAME)
+local button = toolbar:CreateButton("Cloud_Open", "Open Cloud", "rbxassetid://9322329870", "Cloud")
+
+local widgetInfo = DockWidgetPluginGuiInfo.new(
+	Enum.InitialDockState.Right,
+	false,
+	false,
+	430,
+	560,
+	360,
+	420
+)
+
+local widget = plugin:CreateDockWidgetPluginGui(WIDGET_ID, widgetInfo)
+widget.Title = PLUGIN_NAME
+
+local session = {
+	Active = false,
+	Id = nil,
+	Secret = nil,
+	CreatedAt = nil,
+}
+
+local apiConfig = {
+	BaseUrl = CLOUD_BASE_URL,
+	LastStatus = "Not connected",
+	LastStatusColor = nil,
+	ConnectionMode = "Cloud",
+}
+
+local autoSync = {
+	Enabled = false,
+	WasEnabledBeforePlay = false,
+	PullInterval = AUTO_PULL_INTERVAL,
+	UploadInterval = AUTO_UPLOAD_INTERVAL,
+	NextPullAt = 0,
+	NextUploadAt = 0,
+	WorkerRunning = false,
+}
+
+local scannedItems = {}
+local currentSourcePayload = nil
+local lastAppliedApiRevision = 0
+local lastUploadedProjectHash = nil
+local lastUploadAt = nil
+local lastScanCount = 0
+local lastAction = "Idle"
+local secretVisible = false
+local networkBusy = false
+local playPaused = false
+local resolvingBaseUrl = false
+
+local theme = {
+	Background = Color3.fromRGB(15, 15, 15),
+	Panel = Color3.fromRGB(24, 24, 24),
+	PanelDark = Color3.fromRGB(18, 18, 18),
+	PanelSoft = Color3.fromRGB(35, 35, 35),
+	Text = Color3.fromRGB(232, 232, 232),
+	MutedText = Color3.fromRGB(150, 150, 150),
+	AccentStrong = Color3.fromRGB(64, 156, 255),
+	Success = Color3.fromRGB(87, 171, 90),
+	Danger = Color3.fromRGB(190, 68, 68),
+	Warning = Color3.fromRGB(215, 186, 125),
+	Border = Color3.fromRGB(48, 48, 48),
+}
+
+local ui = {}
+
+local function getServiceSafe(serviceName)
+	local success, result = pcall(function()
+		return game:GetService(serviceName)
+	end)
+
+	if success then
+		return result
+	end
+
+	return nil
+end
+
+local StarterPlayer = getServiceSafe("StarterPlayer")
+
+local allowedRoots = {
+	{ Name = "Workspace", Instance = workspace },
+	{ Name = "Lighting", Instance = getServiceSafe("Lighting") },
+	{ Name = "MaterialService", Instance = getServiceSafe("MaterialService") },
+	{ Name = "ReplicatedFirst", Instance = getServiceSafe("ReplicatedFirst") },
+	{ Name = "ReplicatedStorage", Instance = getServiceSafe("ReplicatedStorage") },
+	{ Name = "ServerScriptService", Instance = getServiceSafe("ServerScriptService") },
+	{ Name = "ServerStorage", Instance = getServiceSafe("ServerStorage") },
+	{ Name = "StarterGui", Instance = getServiceSafe("StarterGui") },
+	{ Name = "StarterPack", Instance = getServiceSafe("StarterPack") },
+	{ Name = "StarterPlayer", Instance = StarterPlayer },
+	{ Name = "Teams", Instance = getServiceSafe("Teams") },
+	{ Name = "SoundService", Instance = getServiceSafe("SoundService") },
+	{ Name = "TextChatService", Instance = getServiceSafe("TextChatService") },
+}
+
+local allowedScriptClasses = {
+	Script = true,
+	LocalScript = true,
+	ModuleScript = true,
+}
+
+local allowedCreatableClasses = {
+	Folder = true,
+	Script = true,
+	LocalScript = true,
+	ModuleScript = true,
+}
+
+local function isPlayModeActive()
+	local success, result = pcall(function()
+		return RunService:IsRunning()
+	end)
+
+	if success and result == true then
+		return true
+	end
+
+	local editSuccess, editResult = pcall(function()
+		return RunService:IsEdit()
+	end)
+
+	if editSuccess and editResult == false then
+		return true
+	end
+
+	return false
+end
+
+local function canSync()
+	return not isPlayModeActive()
+end
+
+local function createInstance(className, properties, children)
+	local instance = Instance.new(className)
+
+	for property, value in pairs(properties or {}) do
+		instance[property] = value
+	end
+
+	for _, child in ipairs(children or {}) do
+		child.Parent = instance
+	end
+
+	return instance
+end
+
+local function createCorner(radius)
+	return createInstance("UICorner", {
+		CornerRadius = UDim.new(0, radius),
+	})
+end
+
+local function createStroke(color, thickness, transparency)
+	return createInstance("UIStroke", {
+		Color = color,
+		Thickness = thickness,
+		Transparency = transparency or 0,
+	})
+end
+
+local function createPadding(left, right, top, bottom)
+	return createInstance("UIPadding", {
+		PaddingLeft = UDim.new(0, left or 0),
+		PaddingRight = UDim.new(0, right or 0),
+		PaddingTop = UDim.new(0, top or 0),
+		PaddingBottom = UDim.new(0, bottom or 0),
+	})
+end
+
+local function createLabel(text, size, color, font)
+	return createInstance("TextLabel", {
+		Size = size,
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = color or theme.Text,
+		TextSize = 14,
+		Font = font or Enum.Font.Gotham,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		TextWrapped = true,
+	})
+end
+
+local function createButton(text, backgroundColor)
+	return createInstance("TextButton", {
+		Size = UDim2.new(1, 0, 0, 36),
+		BackgroundColor3 = backgroundColor,
+		BorderSizePixel = 0,
+		Text = text,
+		TextColor3 = theme.Text,
+		TextSize = 13,
+		Font = Enum.Font.GothamMedium,
+		AutoButtonColor = true,
+	}, {
+		createCorner(10),
+		createStroke(Color3.fromRGB(255, 255, 255), 1, 0.94),
+	})
+end
+
+local function createSmallButton(text, backgroundColor)
+	return createInstance("TextButton", {
+		Size = UDim2.new(0.5, -5, 0, 32),
+		BackgroundColor3 = backgroundColor,
+		BorderSizePixel = 0,
+		Text = text,
+		TextColor3 = theme.Text,
+		TextSize = 12,
+		Font = Enum.Font.GothamMedium,
+		AutoButtonColor = true,
+	}, {
+		createCorner(10),
+		createStroke(Color3.fromRGB(255, 255, 255), 1, 0.94),
+	})
+end
+
+local function generateSessionId()
+	local guid = HttpService:GenerateGUID(false):gsub("-", ""):upper()
+	return "SB-" .. guid:sub(1, 8)
+end
+
+local function generateSecret()
+	return HttpService:GenerateGUID(false) .. "-" .. HttpService:GenerateGUID(false)
+end
+
+local function hashString(value)
+	value = tostring(value or "")
+	local hash = 5381
+
+	for index = 1, #value do
+		hash = ((hash * 33) + string.byte(value, index)) % 4294967296
+	end
+
+	return string.format("%08X", hash)
+end
+
+local function normalizeBaseUrl(baseUrl)
+	baseUrl = tostring(baseUrl or ""):gsub("%s+", "")
+
+	while baseUrl:sub(-1) == "/" do
+		baseUrl = baseUrl:sub(1, -2)
+	end
+
+	return baseUrl
+end
+
+local function setLastAction(text)
+	lastAction = tostring(text or "Idle")
+end
+
+local function getRelativePath(root, instance)
+	local names = {}
+	local current = instance
+
+	while current and current ~= root do
+		table.insert(names, 1, current.Name)
+		current = current.Parent
+	end
+
+	return table.concat(names, "/")
+end
+
+local function getParentRelativePath(relativePath)
+	relativePath = tostring(relativePath or "")
+	local parts = string.split(relativePath, "/")
+	table.remove(parts, #parts)
+	return table.concat(parts, "/")
+end
+
+local function getNameFromRelativePath(relativePath)
+	relativePath = tostring(relativePath or "")
+	local parts = string.split(relativePath, "/")
+	return parts[#parts] or relativePath
+end
+
+local function generateItemId(rootName, relativePath, className)
+	local seed = rootName .. "|" .. relativePath .. "|" .. className .. "|" .. HttpService:GenerateGUID(false)
+	return "FILE-" .. hashString(seed)
+end
+
+local function setItemId(instance, itemId)
+	if not instance or typeof(itemId) ~= "string" or itemId == "" then
+		return
+	end
+
+	pcall(function()
+		instance:SetAttribute(ITEM_ID_ATTRIBUTE, itemId)
+	end)
+end
+
+local function readItemId(instance)
+	local existing = nil
+
+	pcall(function()
+		existing = instance:GetAttribute(ITEM_ID_ATTRIBUTE)
+	end)
+
+	if typeof(existing) ~= "string" or existing == "" then
+		pcall(function()
+			existing = instance:GetAttribute(LEGACY_ITEM_ID_ATTRIBUTE)
+		end)
+	end
+
+	if typeof(existing) == "string" and existing ~= "" then
+		pcall(function()
+			instance:SetAttribute(ITEM_ID_ATTRIBUTE, existing)
+		end)
+
+		return existing
+	end
+
+	return nil
+end
+
+local function ensureUniqueItemId(instance, rootName, relativePath, className, usedIds)
+	local existing = readItemId(instance)
+
+	if not existing or usedIds[existing] then
+		existing = generateItemId(rootName, relativePath, className)
+		setItemId(instance, existing)
+	end
+
+	usedIds[existing] = true
+	return existing
+end
+
+local function isScriptClass(className)
+	return allowedScriptClasses[className] == true
+end
+
+local function getRootByName(rootName)
+	for _, rootData in ipairs(allowedRoots) do
+		if rootData.Name == rootName then
+			return rootData.Instance
+		end
+	end
+
+	return nil
+end
+
+local function findInstanceByRelativePath(rootName, relativePath)
+	local root = getRootByName(rootName)
+
+	if not root then
+		return nil
+	end
+
+	relativePath = tostring(relativePath or "")
+
+	if relativePath == "" then
+		return root
+	end
+
+	local current = root
+
+	for _, part in ipairs(string.split(relativePath, "/")) do
+		if part ~= "" then
+			current = current:FindFirstChild(part)
+
+			if not current then
+				return nil
+			end
+		end
+	end
+
+	return current
+end
+
+local function findInstanceByItemId(itemId)
+	if typeof(itemId) ~= "string" or itemId == "" then
+		return nil
+	end
+
+	for _, rootData in ipairs(allowedRoots) do
+		local root = rootData.Instance
+
+		if root then
+			for _, descendant in ipairs(root:GetDescendants()) do
+				if not canSync() then
+					return nil
+				end
+
+				local attribute = nil
+
+				pcall(function()
+					attribute = descendant:GetAttribute(ITEM_ID_ATTRIBUTE)
+				end)
+
+				if typeof(attribute) ~= "string" or attribute == "" then
+					pcall(function()
+						attribute = descendant:GetAttribute(LEGACY_ITEM_ID_ATTRIBUTE)
+					end)
+				end
+
+				if attribute == itemId then
+					return descendant
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+local function resolveParentInstance(rootName, relativePath, parentItemId)
+	local root = getRootByName(rootName)
+
+	if not root then
+		return nil, "Invalid root: " .. tostring(rootName)
+	end
+
+	if typeof(parentItemId) == "string" and parentItemId ~= "" then
+		local byId = findInstanceByItemId(parentItemId)
+
+		if byId then
+			return byId, nil
+		end
+	end
+
+	relativePath = tostring(relativePath or "")
+
+	if relativePath == "" then
+		return root, nil
+	end
+
+	local byPath = findInstanceByRelativePath(rootName, relativePath)
+
+	if byPath then
+		return byPath, nil
+	end
+
+	return nil, "Parent instance not found: " .. tostring(rootName) .. "/" .. tostring(relativePath)
+end
+
+local function readScriptSource(scriptInstance)
+	local success, result = pcall(function()
+		return ScriptEditorService:GetEditorSource(scriptInstance)
+	end)
+
+	if success and typeof(result) == "string" then
+		return result, nil
+	end
+
+	local fallbackSuccess, fallbackResult = pcall(function()
+		return scriptInstance.Source
+	end)
+
+	if fallbackSuccess and typeof(fallbackResult) == "string" then
+		return fallbackResult, nil
+	end
+
+	return nil, tostring(result or fallbackResult)
+end
+
+local function updateScriptSource(scriptInstance, newSource)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	local success, result = pcall(function()
+		ScriptEditorService:UpdateSourceAsync(scriptInstance, function()
+			return newSource
+		end)
+	end)
+
+	if success then
+		return true, nil
+	end
+
+	return false, tostring(result)
+end
+
+local function getWebLoginText()
+	if not session.Active then
+		return ""
+	end
+
+	return table.concat({
+		"Cloud Login",
+		"URL: " .. normalizeBaseUrl(apiConfig.BaseUrl),
+		"Mode: " .. tostring(apiConfig.ConnectionMode or "Unknown"),
+		"Session ID: " .. tostring(session.Id or ""),
+		"Secret: " .. tostring(session.Secret or ""),
+	}, "\n")
+end
+
+local function selectTextBoxText(textBox)
+	if not textBox then
+		return
+	end
+
+	pcall(function()
+		textBox.TextEditable = true
+		textBox:CaptureFocus()
+		textBox.CursorPosition = 1
+		textBox.SelectionStart = #textBox.Text + 1
+	end)
+end
+
+local function putCopyValue(text, label)
+	if not ui.copyBox then
+		return
+	end
+
+	ui.copyBox.Text = tostring(text or "")
+	ui.copyBox.Visible = true
+	selectTextBoxText(ui.copyBox)
+	setLastAction((label or "Value") .. " selected. Press Ctrl+C.")
+end
+
+local function updateSessionView()
+	if not ui.statusLabel then
+		return
+	end
+
+	if playPaused then
+		ui.statusLabel.Text = "Status: Paused during Play Mode"
+		ui.statusLabel.TextColor3 = theme.Warning
+	elseif session.Active then
+		ui.statusLabel.Text = "Status: Active"
+		ui.statusLabel.TextColor3 = theme.Success
+	else
+		ui.statusLabel.Text = "Status: Offline"
+		ui.statusLabel.TextColor3 = theme.MutedText
+	end
+
+	if session.Active then
+		ui.autoSyncStatusLabel.Text = autoSync.Enabled and "Sync: Listening" or "Sync: Stopped"
+		ui.autoSyncStatusLabel.TextColor3 = autoSync.Enabled and theme.Success or theme.MutedText
+		ui.sessionBox.Text = session.Id or "None"
+		ui.sessionBox.TextColor3 = theme.Text
+		ui.secretBox.Text = secretVisible and (session.Secret or "") or SECRET_HIDDEN_TEXT
+		ui.secretBox.TextColor3 = secretVisible and theme.Text or theme.MutedText
+		ui.createSessionButton.Text = "Restart Session"
+		ui.endSessionButton.Visible = true
+		ui.revealSecretButton.Visible = true
+		ui.copyIdButton.Visible = true
+		ui.copySecretButton.Visible = true
+		ui.copyLoginButton.Visible = true
+		ui.revealSecretButton.Text = secretVisible and "Hide Secret" or "Reveal Secret"
+	else
+		ui.autoSyncStatusLabel.Text = "Sync: Stopped"
+		ui.autoSyncStatusLabel.TextColor3 = theme.MutedText
+		ui.sessionBox.Text = "Not created"
+		ui.sessionBox.TextColor3 = theme.MutedText
+		ui.secretBox.Text = "Not created"
+		ui.secretBox.TextColor3 = theme.MutedText
+		ui.createSessionButton.Text = "Create Session"
+		ui.endSessionButton.Visible = false
+		ui.revealSecretButton.Visible = false
+		ui.copyIdButton.Visible = false
+		ui.copySecretButton.Visible = false
+		ui.copyLoginButton.Visible = false
+	end
+end
+
+local function updateApiView()
+	if not ui.apiStatusLabel or not ui.apiBaseUrlBox then
+		return
+	end
+
+	ui.apiBaseUrlBox.Text = apiConfig.BaseUrl
+	ui.apiStatusLabel.Text = "API: " .. apiConfig.LastStatus
+	ui.apiStatusLabel.TextColor3 = apiConfig.LastStatusColor or theme.MutedText
+
+	if ui.connectionModeLabel then
+		ui.connectionModeLabel.Text = "Mode: " .. tostring(apiConfig.ConnectionMode or "Auto")
+	end
+end
+
+local function updateStatsView()
+	if ui.statsLabel then
+		local uploadText = lastUploadAt and os.date("%H:%M:%S", lastUploadAt) or "Never"
+
+		ui.statsLabel.Text = table.concat({
+			"Items: " .. tostring(lastScanCount),
+			"Revision: " .. tostring(lastAppliedApiRevision),
+			"Last Upload: " .. uploadText,
+			"Upload every: " .. tostring(autoSync.UploadInterval) .. "s",
+		}, "\n")
+	end
+
+	if ui.lastActionLabel then
+		ui.lastActionLabel.Text = "Last action: " .. lastAction
+	end
+end
+
+local function updateAllViews()
+	updateSessionView()
+	updateApiView()
+	updateStatsView()
+end
+
+local function decodeJsonResponse(response)
+	if not response.Body or response.Body == "" then
+		return nil, nil
+	end
+
+	local decodeSuccess, decodeResult = pcall(function()
+		return HttpService:JSONDecode(response.Body)
+	end)
+
+	if not decodeSuccess then
+		return nil, "Invalid JSON response: " .. tostring(decodeResult)
+	end
+
+	return decodeResult, nil
+end
+
+local function requestJsonAtBaseUrl(baseUrl, method, path, body, withAuth, maxAttempts)
+	baseUrl = normalizeBaseUrl(baseUrl)
+
+	if baseUrl == "" then
+		return false, nil, "API Base URL is empty."
+	end
+
+	local attempts = math.max(1, tonumber(maxAttempts) or MAX_REQUEST_ATTEMPTS)
+	local lastError = nil
+	local lastDecoded = nil
+
+	for attempt = 1, attempts do
+		if not canSync() then
+			return false, nil, "Cloud is paused while Play Mode is running."
+		end
+
+		local headers = {
+			["Content-Type"] = "application/json",
+		}
+
+		if withAuth then
+			headers["X-Forge-Session"] = session.Id or ""
+			headers["X-Forge-Secret"] = session.Secret or ""
+			headers["X-StudioBridge-Session"] = session.Id or ""
+			headers["X-StudioBridge-Secret"] = session.Secret or ""
+		end
+
+		local requestOptions = {
+			Url = baseUrl .. path,
+			Method = method,
+			Headers = headers,
+		}
+
+		if body ~= nil then
+			requestOptions.Body = HttpService:JSONEncode(body)
+		end
+
+		local success, response = pcall(function()
+			return HttpService:RequestAsync(requestOptions)
+		end)
+
+		if not success then
+			lastError = tostring(response)
+		else
+			local decoded, decodeError = decodeJsonResponse(response)
+			lastDecoded = decoded
+
+			if decodeError then
+				lastError = decodeError
+			elseif response.Success then
+				return true, decoded, nil
+			else
+				local message = "HTTP " .. tostring(response.StatusCode) .. ": " .. tostring(response.StatusMessage)
+
+				if typeof(decoded) == "table" and decoded.error then
+					message = message .. " - " .. tostring(decoded.error)
+				end
+
+				lastError = message
+			end
+		end
+
+		if attempt < attempts then
+			task.wait(REQUEST_RETRY_DELAY)
+		end
+	end
+
+	return false, lastDecoded, lastError or "Request failed."
+end
+
+local function checkHealth(baseUrl)
+	local success, data, requestError = requestJsonAtBaseUrl(baseUrl, "GET", "/health", nil, false, 1)
+
+	if not success then
+		return false, nil, requestError
+	end
+
+	if typeof(data) == "table" and data.ok == true then
+		return true, data, nil
+	end
+
+	return false, data, "Invalid health response."
+end
+
+local function resolveBestBaseUrl(silent)
+	if resolvingBaseUrl then
+		return normalizeBaseUrl(apiConfig.BaseUrl) ~= ""
+	end
+
+	if not canSync() then
+		return false
+	end
+
+	resolvingBaseUrl = true
+
+	if not silent then
+		apiConfig.LastStatus = "Checking local app..."
+		apiConfig.LastStatusColor = theme.Warning
+		updateAllViews()
+	end
+
+	local localOk = checkHealth(LOCAL_BASE_URL)
+
+	if localOk then
+		apiConfig.BaseUrl = LOCAL_BASE_URL
+		apiConfig.ConnectionMode = "Local App"
+		apiConfig.LastStatus = "Connected to local app"
+		apiConfig.LastStatusColor = theme.Success
+		setLastAction("Using local Cloud app")
+		resolvingBaseUrl = false
+		updateAllViews()
+		return true
+	end
+
+	if not silent then
+		apiConfig.LastStatus = "Local app not found. Checking cloud..."
+		apiConfig.LastStatusColor = theme.Warning
+		updateAllViews()
+	end
+
+	local cloudOk, cloudData, cloudError = checkHealth(CLOUD_BASE_URL)
+
+	if cloudOk then
+		apiConfig.BaseUrl = CLOUD_BASE_URL
+		apiConfig.ConnectionMode = "Cloud"
+		apiConfig.LastStatus = "Connected to cloud"
+		apiConfig.LastStatusColor = theme.Success
+		setLastAction("Using Cloud cloud server")
+		resolvingBaseUrl = false
+		updateAllViews()
+		return true
+	end
+
+	apiConfig.BaseUrl = CLOUD_BASE_URL
+	apiConfig.ConnectionMode = "Cloud"
+	apiConfig.LastStatus = "Connection failed: " .. tostring(cloudError or "No Cloud server found")
+	apiConfig.LastStatusColor = theme.Danger
+	setLastAction("API auto-detect failed")
+	resolvingBaseUrl = false
+	updateAllViews()
+	return false
+end
+
+local function requestJson(method, path, body)
+	if not canSync() then
+		return false, nil, "Cloud is paused while Play Mode is running."
+	end
+
+	if normalizeBaseUrl(apiConfig.BaseUrl) == "" then
+		local resolved = resolveBestBaseUrl(true)
+
+		if not resolved then
+			return false, nil, "Could not find a Cloud API server."
+		end
+	end
+
+	return requestJsonAtBaseUrl(apiConfig.BaseUrl, method, path, body, true, MAX_REQUEST_ATTEMPTS)
+end
+
+local function getInstanceDepth(root, instance)
+	local depth = 0
+	local current = instance
+
+	while current and current ~= root do
+		depth += 1
+		current = current.Parent
+	end
+
+	return depth
+end
+
+local function scanProject(silent)
+	if not canSync() then
+		setLastAction("Scan blocked during Play Mode")
+		updateAllViews()
+		return
+	end
+
+	table.clear(scannedItems)
+
+	local seen = {}
+	local usedItemIds = {}
+
+	for _, rootData in ipairs(allowedRoots) do
+		if not canSync() then
+			return
+		end
+
+		local root = rootData.Instance
+
+		if root then
+			local visible = {}
+			local visibleList = {}
+			local assignedItemIds = {}
+
+			for _, descendant in ipairs(root:GetDescendants()) do
+				if not canSync() then
+					return
+				end
+
+				if descendant.ClassName == "Folder" then
+					visible[descendant] = true
+				elseif isScriptClass(descendant.ClassName) then
+					local current = descendant
+
+					while current and current ~= root do
+						visible[current] = true
+						current = current.Parent
+					end
+				end
+			end
+
+			for instance in pairs(visible) do
+				table.insert(visibleList, instance)
+			end
+
+			table.sort(visibleList, function(a, b)
+				local depthA = getInstanceDepth(root, a)
+				local depthB = getInstanceDepth(root, b)
+
+				if depthA == depthB then
+					local pathA = getRelativePath(root, a)
+					local pathB = getRelativePath(root, b)
+
+					if pathA == pathB then
+						return false
+					end
+
+					return pathA < pathB
+				end
+
+				return depthA < depthB
+			end)
+
+			for _, instance in ipairs(visibleList) do
+				if not canSync() then
+					return
+				end
+
+				if instance and instance.Parent then
+					local relativePath = getRelativePath(root, instance)
+					assignedItemIds[instance] = ensureUniqueItemId(instance, rootData.Name, relativePath, instance.ClassName, usedItemIds)
+				end
+			end
+
+			for _, instance in ipairs(visibleList) do
+				if not canSync() then
+					return
+				end
+
+				if instance and instance.Parent then
+					local relativePath = getRelativePath(root, instance)
+					local itemId = assignedItemIds[instance] or ensureUniqueItemId(instance, rootData.Name, relativePath, instance.ClassName, usedItemIds)
+
+					if not seen[itemId] then
+						seen[itemId] = true
+
+						local parentRelativePath = getParentRelativePath(relativePath)
+						local parentItemId = ""
+
+						if instance.Parent and instance.Parent ~= root then
+							parentItemId = assignedItemIds[instance.Parent] or readItemId(instance.Parent) or ""
+						end
+
+						local kind = isScriptClass(instance.ClassName) and "script" or (instance.ClassName == "Folder" and "folder" or "instance")
+
+						table.insert(scannedItems, {
+							FileId = itemId,
+							ItemId = itemId,
+							ParentItemId = parentItemId,
+							Name = instance.Name,
+							ClassName = instance.ClassName,
+							Kind = kind,
+							Root = rootData.Name,
+							RelativePath = relativePath,
+							ParentRelativePath = parentRelativePath,
+							Instance = instance,
+						})
+					end
+				end
+			end
+		end
+	end
+
+	table.sort(scannedItems, function(a, b)
+		if a.Root == b.Root then
+			if a.ParentItemId == b.ParentItemId then
+				if a.Name == b.Name then
+					return a.FileId < b.FileId
+				end
+
+				return a.Name < b.Name
+			end
+
+			return a.RelativePath < b.RelativePath
+		end
+
+		return a.Root < b.Root
+	end)
+
+	lastScanCount = #scannedItems
+	updateStatsView()
+
+	if not silent then
+		print("[Cloud] Project scanned. Visible hierarchy items found:", #scannedItems)
+	end
+end
+
+local function buildSourcePayload(silent)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	if not session.Active then
+		return false, "Cannot build payload without an active session."
+	end
+
+	if #scannedItems == 0 then
+		scanProject(true)
+	end
+
+	local payloadFiles = {}
+	local errors = {}
+	local hashParts = {}
+
+	for _, itemInfo in ipairs(scannedItems) do
+		if not canSync() then
+			return false, "Cloud is paused while Play Mode is running."
+		end
+
+		local source = ""
+		local sourceHash = hashString(itemInfo.ClassName .. "|" .. itemInfo.RelativePath)
+		local canInsert = true
+
+		if isScriptClass(itemInfo.ClassName) then
+			local readError = nil
+			source, readError = readScriptSource(itemInfo.Instance)
+
+			if source then
+				sourceHash = hashString(source)
+			else
+				canInsert = false
+
+				table.insert(errors, {
+					fileId = itemInfo.FileId,
+					itemId = itemInfo.ItemId or itemInfo.FileId,
+					parentItemId = itemInfo.ParentItemId or "",
+					name = itemInfo.Name,
+					className = itemInfo.ClassName,
+					kind = itemInfo.Kind,
+					root = itemInfo.Root,
+					relativePath = itemInfo.RelativePath,
+					parentRelativePath = itemInfo.ParentRelativePath,
+					error = readError,
+				})
+			end
+		end
+
+		if canInsert then
+			table.insert(payloadFiles, {
+				fileId = itemInfo.FileId,
+				itemId = itemInfo.ItemId or itemInfo.FileId,
+				parentItemId = itemInfo.ParentItemId or "",
+				name = itemInfo.Name,
+				className = itemInfo.ClassName,
+				kind = itemInfo.Kind,
+				root = itemInfo.Root,
+				relativePath = itemInfo.RelativePath,
+				parentRelativePath = itemInfo.ParentRelativePath,
+				source = source,
+				sourceLength = #source,
+				sourceHash = sourceHash,
+			})
+
+			table.insert(hashParts, table.concat({ itemInfo.FileId, itemInfo.ParentItemId or "", itemInfo.Root, itemInfo.RelativePath, itemInfo.ClassName, sourceHash }, ":"))
+		end
+	end
+
+	table.sort(hashParts)
+
+	local projectHash = hashString(table.concat(hashParts, "|"))
+
+	currentSourcePayload = {
+		sessionId = session.Id,
+		createdAt = os.time(),
+		filesCount = #payloadFiles,
+		itemsCount = #payloadFiles,
+		projectHash = projectHash,
+		files = payloadFiles,
+		errors = errors,
+	}
+
+	if not silent then
+		print("[Cloud] Payload built. Items:", #payloadFiles, "Errors:", #errors)
+	end
+
+	return true, nil, projectHash
+end
+
+local function findScannedItemByFileId(fileId)
+	for _, scriptInfo in ipairs(scannedItems) do
+		if scriptInfo.FileId == fileId then
+			return scriptInfo
+		end
+	end
+
+	return nil
+end
+
+local function applyFileSource(fileId, newSource, change)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	local scriptInfo = findScannedItemByFileId(fileId)
+
+	if not scriptInfo then
+		scanProject(true)
+		scriptInfo = findScannedItemByFileId(fileId)
+	end
+
+	if not scriptInfo and typeof(change) == "table" and change.root and change.relativePath then
+		local instance = findInstanceByRelativePath(change.root, change.relativePath)
+
+		if instance and isScriptClass(instance.ClassName) then
+			scriptInfo = {
+				FileId = fileId,
+				Name = instance.Name,
+				ClassName = instance.ClassName,
+				Root = change.root,
+				RelativePath = change.relativePath,
+				Instance = instance,
+			}
+		end
+	end
+
+	if not scriptInfo then
+		return false, "FileId not found in current scanned scripts: " .. tostring(fileId)
+	end
+
+	if not isScriptClass(scriptInfo.ClassName) then
+		return false, "Cannot update source for non-script item: " .. tostring(scriptInfo.RelativePath)
+	end
+
+	if not scriptInfo.Instance or not scriptInfo.Instance.Parent then
+		return false, "Script instance is no longer valid: " .. tostring(fileId)
+	end
+
+	local currentSource = readScriptSource(scriptInfo.Instance)
+
+	if currentSource == newSource then
+		return true, nil
+	end
+
+	local success, updateError = updateScriptSource(scriptInfo.Instance, newSource)
+
+	if not success then
+		return false, updateError
+	end
+
+	lastUploadedProjectHash = nil
+	return true, nil
+end
+
+local function applyCreateInstance(change)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	local className = tostring(change.className or "")
+	local rootName = tostring(change.root or "")
+	local relativePath = tostring(change.relativePath or "")
+	local parentRelativePath = tostring(change.parentRelativePath or getParentRelativePath(relativePath))
+	local parentItemId = tostring(change.parentItemId or "")
+	local name = tostring(change.name or getNameFromRelativePath(relativePath))
+	local itemId = tostring(change.itemId or change.fileId or "")
+
+	if not allowedCreatableClasses[className] then
+		return false, "Cloud only creates Folder, Script, LocalScript and ModuleScript. Unsupported: " .. className
+	end
+
+	if name == "" then
+		return false, "Created instance name is empty."
+	end
+
+	if relativePath == "" then
+		relativePath = parentRelativePath ~= "" and (parentRelativePath .. "/" .. name) or name
+	end
+
+	local parent, parentError = resolveParentInstance(rootName, parentRelativePath, parentItemId)
+
+	if not parent then
+		return false, parentError
+	end
+
+	local existing = itemId ~= "" and findInstanceByItemId(itemId) or nil
+
+	if existing then
+		if existing.Name ~= name then
+			existing.Name = name
+		end
+
+		if existing.Parent ~= parent then
+			local parentSuccess, parentResult = pcall(function()
+				existing.Parent = parent
+			end)
+
+			if not parentSuccess then
+				return false, tostring(parentResult)
+			end
+		end
+
+		if isScriptClass(existing.ClassName) and typeof(change.source) == "string" then
+			local currentSource = readScriptSource(existing)
+
+			if currentSource ~= change.source then
+				local success, updateError = updateScriptSource(existing, change.source)
+
+				if not success then
+					return false, updateError
+				end
+			end
+		end
+
+		lastUploadedProjectHash = nil
+		return true, nil
+	end
+
+	local instance = Instance.new(className)
+	instance.Name = name
+	setItemId(instance, itemId)
+
+	local parentSuccess, parentResult = pcall(function()
+		instance.Parent = parent
+	end)
+
+	if not parentSuccess then
+		instance:Destroy()
+		return false, tostring(parentResult)
+	end
+
+	if isScriptClass(className) and typeof(change.source) == "string" then
+		local success, updateError = updateScriptSource(instance, change.source)
+
+		if not success then
+			return false, updateError
+		end
+	end
+
+	lastUploadedProjectHash = nil
+	return true, nil
+end
+
+local function applyDeleteInstance(change)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	local instance = nil
+	local itemId = tostring(change.itemId or change.fileId or "")
+
+	if itemId ~= "" then
+		instance = findInstanceByItemId(itemId)
+	end
+
+	if not instance and typeof(change.fileId) == "string" then
+		local itemInfo = findScannedItemByFileId(change.fileId)
+
+		if itemInfo then
+			instance = itemInfo.Instance
+		end
+	end
+
+	if not instance and typeof(change.fromRoot) == "string" and typeof(change.fromRelativePath) == "string" then
+		instance = findInstanceByRelativePath(change.fromRoot, change.fromRelativePath)
+	end
+
+	if not instance and typeof(change.root) == "string" and typeof(change.relativePath) == "string" then
+		instance = findInstanceByRelativePath(change.root, change.relativePath)
+	end
+
+	if not instance then
+		return true, nil
+	end
+
+	for _, rootData in ipairs(allowedRoots) do
+		if instance == rootData.Instance then
+			return false, "Cloud cannot delete tracked root services."
+		end
+	end
+
+	instance:Destroy()
+	lastUploadedProjectHash = nil
+	return true, nil
+end
+
+local function applyMoveInstance(change)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	local itemId = tostring(change.itemId or change.fileId or "")
+	local instance = itemId ~= "" and findInstanceByItemId(itemId) or nil
+
+	if not instance and typeof(change.fileId) == "string" then
+		local itemInfo = findScannedItemByFileId(change.fileId)
+
+		if itemInfo then
+			instance = itemInfo.Instance
+		end
+	end
+
+	if not instance and typeof(change.fromRoot) == "string" and typeof(change.fromRelativePath) == "string" then
+		instance = findInstanceByRelativePath(change.fromRoot, change.fromRelativePath)
+	end
+
+	if not instance then
+		return false, "Moved script not found."
+	end
+
+	if not isScriptClass(instance.ClassName) and instance.ClassName ~= "Folder" then
+		return false, "Cloud only moves Folder, Script, LocalScript and ModuleScript."
+	end
+
+	for _, rootData in ipairs(allowedRoots) do
+		if instance == rootData.Instance then
+			return false, "Cloud cannot move tracked root services."
+		end
+	end
+
+	local targetRoot = tostring(change.root or "")
+	local targetParentPath = tostring(change.parentRelativePath or "")
+	local parentItemId = tostring(change.parentItemId or "")
+	local parent, parentError = resolveParentInstance(targetRoot, targetParentPath, parentItemId)
+
+	if not parent then
+		return false, parentError
+	end
+
+	local current = parent
+
+	while current do
+		if current == instance then
+			return false, "A script cannot be moved inside itself or one of its descendants."
+		end
+
+		current = current.Parent
+	end
+
+	local newName = tostring(change.name or getNameFromRelativePath(change.relativePath or instance.Name))
+
+	if newName == "" then
+		newName = instance.Name
+	end
+
+	setItemId(instance, itemId)
+	instance.Name = newName
+
+	if instance.Parent ~= parent then
+		local parentSuccess, parentResult = pcall(function()
+			instance.Parent = parent
+		end)
+
+		if not parentSuccess then
+			return false, tostring(parentResult)
+		end
+	end
+
+	lastUploadedProjectHash = nil
+	return true, nil
+end
+
+local function applyRemoteChanges(changes, sourceName, currentRevision)
+	if not canSync() then
+		return false, "Cloud is paused while Play Mode is running."
+	end
+
+	if not session.Active then
+		return false, "Cannot apply remote changes without an active session."
+	end
+
+	if typeof(changes) ~= "table" then
+		return false, "Changes payload must be a table."
+	end
+
+	local revisionCursor = typeof(currentRevision) == "number" and currentRevision or 0
+
+	table.sort(changes, function(a, b)
+		return (a.revision or 0) < (b.revision or 0)
+	end)
+
+	local appliedCount = 0
+
+	for _, change in ipairs(changes) do
+		if not canSync() then
+			return false, "Cloud is paused while Play Mode is running.", revisionCursor, appliedCount
+		end
+
+		if typeof(change.revision) ~= "number" then
+			return false, "Invalid change revision.", revisionCursor, appliedCount
+		end
+
+		if change.revision > revisionCursor then
+			local changeType = tostring(change.type or "updateSource")
+			local success = false
+			local applyError = nil
+
+			if changeType == "createInstance" then
+				success, applyError = applyCreateInstance(change)
+			elseif changeType == "deleteInstance" then
+				success, applyError = applyDeleteInstance(change)
+			elseif changeType == "moveInstance" then
+				success, applyError = applyMoveInstance(change)
+			elseif changeType == "updateSource" then
+				if typeof(change.fileId) ~= "string" or change.fileId == "" then
+					return false, "Invalid change fileId.", revisionCursor, appliedCount
+				end
+
+				if typeof(change.source) ~= "string" then
+					return false, "Invalid change source.", revisionCursor, appliedCount
+				end
+
+				success, applyError = applyFileSource(change.fileId, change.source, change)
+			else
+				return false, "Unsupported change type: " .. changeType, revisionCursor, appliedCount
+			end
+
+			if not success then
+				return false, applyError, revisionCursor, appliedCount
+			end
+
+			revisionCursor = math.max(revisionCursor, change.revision)
+			appliedCount += 1
+		end
+	end
+
+	if appliedCount > 0 then
+		scanProject(true)
+		setLastAction("Applied " .. tostring(appliedCount) .. " web change(s)")
+		updateStatsView()
+	end
+
+	return true, nil, revisionCursor, appliedCount
+end
+
+local function pullApiChangesOnce(silent)
+	if not canSync() then
+		if not silent then
+			setLastAction("Pull blocked during Play Mode")
+			updateAllViews()
+		end
+
+		return false
+	end
+
+	if not session.Active then
+		if not silent then
+			warn("[Cloud] Cannot pull API changes without an active session.")
+		end
+
+		return false
+	end
+
+	local path = "/sessions/" .. session.Id .. "/changes?after=" .. tostring(lastAppliedApiRevision)
+	local success, data, requestError = requestJson("GET", path, nil)
+
+	if not success then
+		apiConfig.LastStatus = "Pull failed: " .. tostring(requestError)
+		apiConfig.LastStatusColor = theme.Danger
+		setLastAction("Pull failed")
+		updateAllViews()
+
+		if not silent then
+			warn("[Cloud] Failed to pull API changes:", requestError)
+		end
+
+		return false
+	end
+
+	local changes = {}
+
+	if typeof(data) == "table" and typeof(data.changes) == "table" then
+		changes = data.changes
+	end
+
+	if #changes == 0 then
+		if typeof(data) == "table" and typeof(data.lastRevision) == "number" then
+			lastAppliedApiRevision = math.max(lastAppliedApiRevision, data.lastRevision)
+		end
+
+		if not silent then
+			apiConfig.LastStatus = "No web changes pending"
+			apiConfig.LastStatusColor = theme.MutedText
+			setLastAction("No web changes")
+			updateAllViews()
+		else
+			updateStatsView()
+		end
+
+		return true
+	end
+
+	local applySuccess, applyError, newRevision, appliedCount = applyRemoteChanges(changes, "HTTP", lastAppliedApiRevision)
+
+	if not applySuccess then
+		apiConfig.LastStatus = "Apply failed: " .. tostring(applyError)
+		apiConfig.LastStatusColor = theme.Danger
+		setLastAction("Apply failed")
+		updateAllViews()
+		warn("[Cloud] Failed to apply API changes:", applyError)
+		return false
+	end
+
+	lastAppliedApiRevision = newRevision or lastAppliedApiRevision
+	apiConfig.LastStatus = "Applied " .. tostring(appliedCount or 0) .. " web save(s)"
+	apiConfig.LastStatusColor = theme.Success
+	updateAllViews()
+
+	return true
+end
+
+local function uploadCurrentProjectToApi(silent, force)
+	if not canSync() then
+		if not silent then
+			setLastAction("Upload blocked during Play Mode")
+			updateAllViews()
+		end
+
+		return false
+	end
+
+	if not session.Active then
+		if not silent then
+			warn("[Cloud] Cannot upload workspace files without an active session.")
+		end
+
+		return false
+	end
+
+	scanProject(true)
+
+	local payloadSuccess, payloadError, projectHash = buildSourcePayload(true)
+
+	if not payloadSuccess then
+		apiConfig.LastStatus = "Build failed: " .. tostring(payloadError)
+		apiConfig.LastStatusColor = theme.Danger
+		setLastAction("Build failed")
+		updateAllViews()
+
+		if not silent then
+			warn("[Cloud] Cannot upload workspace files:", payloadError)
+		end
+
+		return false
+	end
+
+	if not force and lastUploadedProjectHash == projectHash then
+		if not silent then
+			apiConfig.LastStatus = "Workspace already synced"
+			apiConfig.LastStatusColor = theme.MutedText
+			setLastAction("Workspace already synced")
+			updateAllViews()
+		end
+
+		return true
+	end
+
+	apiConfig.LastStatus = silent and "Auto uploading workspace..." or "Uploading workspace..."
+	apiConfig.LastStatusColor = theme.Warning
+	setLastAction(apiConfig.LastStatus)
+	updateAllViews()
+
+	local success, data, requestError = requestJson("POST", "/sessions/upload", currentSourcePayload)
+
+	if not success then
+		apiConfig.LastStatus = "Upload failed: " .. tostring(requestError)
+		apiConfig.LastStatusColor = theme.Danger
+		setLastAction("Workspace upload failed")
+		updateAllViews()
+		warn("[Cloud] Workspace upload failed:", requestError)
+		return false
+	end
+
+	local filesCount = 0
+
+	if typeof(data) == "table" and data.filesCount then
+		filesCount = data.filesCount
+	end
+
+	if typeof(data) == "table" and typeof(data.lastRevision) == "number" then
+		lastAppliedApiRevision = math.max(lastAppliedApiRevision, data.lastRevision)
+	end
+
+	lastUploadedProjectHash = projectHash
+	lastUploadAt = os.time()
+	apiConfig.LastStatus = "Workspace synced: " .. tostring(filesCount) .. " item(s)"
+	apiConfig.LastStatusColor = theme.Success
+	setLastAction("Workspace synced: " .. tostring(filesCount) .. " item(s)")
+	updateAllViews()
+
+	if not silent then
+		print("[Cloud] Workspace uploaded to API. Items:", filesCount)
+	end
+
+	return true
+end
+
+local function startAutomation()
+	if not canSync() then
+		playPaused = true
+		setLastAction("Sync paused during Play Mode")
+		updateAllViews()
+		return
+	end
+
+	if autoSync.Enabled then
+		updateSessionView()
+		return
+	end
+
+	if not session.Active then
+		warn("[Cloud] Cannot start automation without an active session.")
+		return
+	end
+
+	if normalizeBaseUrl(apiConfig.BaseUrl) == "" then
+		local resolved = resolveBestBaseUrl(false)
+
+		if not resolved then
+			return
+		end
+	end
+
+	autoSync.Enabled = true
+	autoSync.NextPullAt = os.clock() + autoSync.PullInterval
+	autoSync.NextUploadAt = os.clock() + autoSync.UploadInterval
+	setLastAction("Automation started")
+	updateAllViews()
+	print("[Cloud] Automation started.")
+
+	if autoSync.WorkerRunning then
+		return
+	end
+
+	autoSync.WorkerRunning = true
+
+	task.spawn(function()
+		while autoSync.Enabled do
+			if not session.Active then
+				autoSync.Enabled = false
+				break
+			end
+
+			if not canSync() then
+				playPaused = true
+				autoSync.WasEnabledBeforePlay = true
+				autoSync.Enabled = false
+				networkBusy = false
+				setLastAction("Sync paused during Play Mode")
+				updateAllViews()
+				break
+			end
+
+			if not networkBusy then
+				local now = os.clock()
+
+				if now >= autoSync.NextPullAt then
+					networkBusy = true
+					pullApiChangesOnce(true)
+					networkBusy = false
+					autoSync.NextPullAt = now + autoSync.PullInterval
+				end
+
+				if now >= autoSync.NextUploadAt then
+					networkBusy = true
+					local pulled = pullApiChangesOnce(true)
+
+					if pulled then
+						uploadCurrentProjectToApi(true, false)
+					end
+
+					networkBusy = false
+					autoSync.NextUploadAt = now + autoSync.UploadInterval
+				end
+			end
+
+			task.wait(0.2)
+		end
+
+		networkBusy = false
+		autoSync.WorkerRunning = false
+		updateAllViews()
+	end)
+end
+
+local function createSession()
+	if not canSync() then
+		playPaused = true
+		setLastAction("Cannot create session during Play Mode")
+		updateAllViews()
+		return
+	end
+
+	if autoSync.Enabled then
+		autoSync.Enabled = false
+		task.wait(0.1)
+	end
+
+	local resolved = resolveBestBaseUrl(false)
+
+	if not resolved then
+		return
+	end
+
+	secretVisible = false
+	session.Active = true
+	session.Id = generateSessionId()
+	session.Secret = generateSecret()
+	session.CreatedAt = os.time()
+
+	table.clear(scannedItems)
+	currentSourcePayload = nil
+	lastAppliedApiRevision = 0
+	lastUploadedProjectHash = nil
+	lastUploadAt = nil
+	lastScanCount = 0
+	setLastAction("Session created")
+	updateAllViews()
+	print("[Cloud] Session created:", session.Id)
+
+	local connected = requestJson("GET", "/health", nil)
+
+	if connected then
+		apiConfig.LastStatus = "Connected to " .. tostring(apiConfig.ConnectionMode or "Cloud")
+		apiConfig.LastStatusColor = theme.Success
+		uploadCurrentProjectToApi(false, true)
+		startAutomation()
+	else
+		apiConfig.LastStatus = "Connection failed"
+		apiConfig.LastStatusColor = theme.Danger
+		setLastAction("Session created, API not connected")
+		updateAllViews()
+	end
+end
+
+local function endSession()
+	autoSync.Enabled = false
+	autoSync.WasEnabledBeforePlay = false
+	session.Active = false
+	session.Id = nil
+	session.Secret = nil
+	session.CreatedAt = nil
+	secretVisible = false
+	table.clear(scannedItems)
+	currentSourcePayload = nil
+	lastAppliedApiRevision = 0
+	lastUploadedProjectHash = nil
+	lastUploadAt = nil
+	lastScanCount = 0
+	setLastAction("Session ended")
+	updateAllViews()
+	print("[Cloud] Session ended.")
+end
+
+local function manualRefreshNow()
+	if not canSync() then
+		playPaused = true
+		setLastAction("Sync blocked during Play Mode")
+		updateAllViews()
+		return
+	end
+
+	if not session.Active then
+		warn("[Cloud] Create a session first.")
+		return
+	end
+
+	if networkBusy then
+		setLastAction("Sync already running")
+		updateAllViews()
+		return
+	end
+
+	networkBusy = true
+	local pulled = pullApiChangesOnce(false)
+
+	if pulled then
+		uploadCurrentProjectToApi(false, true)
+	end
+
+	networkBusy = false
+end
+
+local function copySessionId()
+	if not session.Active or not session.Id then
+		return
+	end
+
+	putCopyValue(session.Id, "Session ID")
+	updateAllViews()
+	selectTextBoxText(ui.copyBox)
+end
+
+local function copySecret()
+	if not session.Active or not session.Secret then
+		return
+	end
+
+	secretVisible = true
+	putCopyValue(session.Secret, "Secret")
+	updateAllViews()
+	selectTextBoxText(ui.copyBox)
+end
+
+local function copyLoginBlock()
+	if not session.Active then
+		return
+	end
+
+	secretVisible = true
+	putCopyValue(getWebLoginText(), "Login block")
+	updateAllViews()
+	selectTextBoxText(ui.copyBox)
+end
+
+local function toggleSecretVisible()
+	if not session.Active then
+		return
+	end
+
+	secretVisible = not secretVisible
+	setLastAction(secretVisible and "Secret revealed" or "Secret hidden")
+	updateAllViews()
+end
+
+local function createCard(parent, name, height, order)
+	local card = createInstance("Frame", {
+		Name = name,
+		Size = UDim2.new(1, 0, 0, height),
+		BackgroundColor3 = theme.Panel,
+		BorderSizePixel = 0,
+		LayoutOrder = order,
+		Parent = parent,
+	}, {
+		createCorner(12),
+		createStroke(theme.Border, 1, 0.15),
+		createPadding(12, 12, 12, 12),
+	})
+
+	createInstance("UIListLayout", {
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = card,
+	})
+
+	return card
+end
+
+local function buildWidget()
+	widget:ClearAllChildren()
+	table.clear(ui)
+
+	local root = createInstance("ScrollingFrame", {
+		Name = "Root",
+		Size = UDim2.fromScale(1, 1),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 6,
+		BackgroundColor3 = theme.Background,
+		BorderSizePixel = 0,
+		Parent = widget,
+	}, {
+		createPadding(16, 16, 16, 16),
+	})
+
+	createInstance("UIListLayout", {
+		Padding = UDim.new(0, 12),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = root,
+	})
+
+	local title = createLabel("Cloud", UDim2.new(1, 0, 0, 30), theme.Text, Enum.Font.GothamBold)
+	title.TextSize = 22
+	title.LayoutOrder = 1
+	title.Parent = root
+
+	local subtitle = createLabel("Private development session for Cloud.", UDim2.new(1, 0, 0, 30), theme.MutedText, Enum.Font.Gotham)
+	subtitle.TextSize = 12
+	subtitle.TextYAlignment = Enum.TextYAlignment.Top
+	subtitle.LayoutOrder = 2
+	subtitle.Parent = root
+
+	local sessionCard = createCard(root, "SessionCard", 396, 3)
+
+	ui.statusLabel = createLabel("Status: Offline", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
+	ui.statusLabel.LayoutOrder = 1
+	ui.statusLabel.Parent = sessionCard
+
+	ui.autoSyncStatusLabel = createLabel("Sync: Stopped", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
+	ui.autoSyncStatusLabel.LayoutOrder = 2
+	ui.autoSyncStatusLabel.Parent = sessionCard
+
+	local sessionTitle = createLabel("Session ID", UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.Gotham)
+	sessionTitle.TextSize = 12
+	sessionTitle.LayoutOrder = 3
+	sessionTitle.Parent = sessionCard
+
+	ui.sessionBox = createInstance("TextBox", {
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		Text = "Not created",
+		TextColor3 = theme.MutedText,
+		TextSize = 14,
+		Font = Enum.Font.Code,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		TextEditable = true,
+		LayoutOrder = 4,
+		Parent = sessionCard,
+	}, {
+		createCorner(10),
+		createPadding(10, 10, 0, 0),
+	})
+
+	local secretTitle = createLabel("Hidden Secret", UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.Gotham)
+	secretTitle.TextSize = 12
+	secretTitle.LayoutOrder = 5
+	secretTitle.Parent = sessionCard
+
+	ui.secretBox = createInstance("TextBox", {
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		Text = "Not created",
+		TextColor3 = theme.MutedText,
+		TextSize = 12,
+		Font = Enum.Font.Code,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		TextEditable = true,
+		LayoutOrder = 6,
+		Parent = sessionCard,
+	}, {
+		createCorner(10),
+		createPadding(10, 10, 0, 0),
+	})
+
+	ui.copyBox = createInstance("TextBox", {
+		Size = UDim2.new(1, 0, 0, 64),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		Text = "Click Copy Session ID or Copy Secret, then press Ctrl+C.",
+		TextColor3 = theme.Text,
+		TextSize = 11,
+		Font = Enum.Font.Code,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ClearTextOnFocus = false,
+		TextEditable = true,
+		MultiLine = true,
+		LayoutOrder = 7,
+		Parent = sessionCard,
+	}, {
+		createCorner(10),
+		createPadding(10, 10, 8, 8),
+	})
+
+	ui.createSessionButton = createButton("Create Session", theme.AccentStrong)
+	ui.createSessionButton.LayoutOrder = 8
+	ui.createSessionButton.Parent = sessionCard
+
+	local copyButtons = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundTransparency = 1,
+		LayoutOrder = 9,
+		Parent = sessionCard,
+	})
+
+	createInstance("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = copyButtons,
+	})
+
+	ui.copyIdButton = createSmallButton("Copy Session ID", theme.PanelSoft)
+	ui.copyIdButton.LayoutOrder = 1
+	ui.copyIdButton.Parent = copyButtons
+
+	ui.copySecretButton = createSmallButton("Copy Secret", theme.PanelSoft)
+	ui.copySecretButton.LayoutOrder = 2
+	ui.copySecretButton.Parent = copyButtons
+
+	local secondButtons = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundTransparency = 1,
+		LayoutOrder = 10,
+		Parent = sessionCard,
+	})
+
+	createInstance("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = secondButtons,
+	})
+
+	ui.revealSecretButton = createSmallButton("Reveal Secret", theme.PanelSoft)
+	ui.revealSecretButton.LayoutOrder = 1
+	ui.revealSecretButton.Parent = secondButtons
+
+	ui.copyLoginButton = createSmallButton("Copy Login Block", theme.PanelSoft)
+	ui.copyLoginButton.LayoutOrder = 2
+	ui.copyLoginButton.Parent = secondButtons
+
+	local endButtons = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundTransparency = 1,
+		LayoutOrder = 11,
+		Parent = sessionCard,
+	})
+
+	createInstance("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = endButtons,
+	})
+
+	ui.endSessionButton = createSmallButton("End Session", theme.Danger)
+	ui.endSessionButton.LayoutOrder = 1
+	ui.endSessionButton.Parent = endButtons
+
+	local playModeNote = createSmallButton("Auto-pauses on Play", theme.PanelDark)
+	playModeNote.LayoutOrder = 2
+	playModeNote.TextColor3 = theme.MutedText
+	playModeNote.AutoButtonColor = false
+	playModeNote.Parent = endButtons
+
+	local apiCard = createCard(root, "ApiCard", 238, 4)
+
+	local apiTitle = createLabel("Connection", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
+	apiTitle.TextSize = 15
+	apiTitle.LayoutOrder = 1
+	apiTitle.Parent = apiCard
+
+	ui.apiStatusLabel = createLabel("API: Not connected", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.Gotham)
+	ui.apiStatusLabel.TextSize = 13
+	ui.apiStatusLabel.LayoutOrder = 2
+	ui.apiStatusLabel.Parent = apiCard
+
+	ui.connectionModeLabel = createLabel("Mode: Auto", UDim2.new(1, 0, 0, 20), theme.MutedText, Enum.Font.Gotham)
+	ui.connectionModeLabel.TextSize = 12
+	ui.connectionModeLabel.LayoutOrder = 3
+	ui.connectionModeLabel.Parent = apiCard
+
+	ui.apiBaseUrlBox = createInstance("TextBox", {
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		Text = apiConfig.BaseUrl,
+		TextColor3 = theme.Text,
+		TextSize = 13,
+		Font = Enum.Font.Code,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		TextEditable = true,
+		LayoutOrder = 4,
+		Parent = apiCard,
+	}, {
+		createCorner(10),
+		createPadding(10, 10, 0, 0),
+	})
+
+	local apiButtons = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundTransparency = 1,
+		LayoutOrder = 5,
+		Parent = apiCard,
+	})
+
+	createInstance("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = apiButtons,
+	})
+
+	ui.testApiButton = createSmallButton("Detect API", theme.PanelSoft)
+	ui.testApiButton.LayoutOrder = 1
+	ui.testApiButton.Parent = apiButtons
+
+	ui.manualRefreshButton = createSmallButton("Sync Now", theme.Warning)
+	ui.manualRefreshButton.TextColor3 = Color3.fromRGB(30, 30, 30)
+	ui.manualRefreshButton.LayoutOrder = 2
+	ui.manualRefreshButton.Parent = apiButtons
+
+	local hint = createLabel("Cloud uses localhost:3000 when the app is open. If not, it falls back to Render cloud.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
+	hint.TextSize = 12
+	hint.LayoutOrder = 6
+	hint.Parent = apiCard
+
+	local statsCard = createCard(root, "StatsCard", 164, 5)
+
+	local statsTitle = createLabel("Live Status", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
+	statsTitle.TextSize = 15
+	statsTitle.LayoutOrder = 1
+	statsTitle.Parent = statsCard
+
+	ui.statsLabel = createLabel("Items: 0\nRevision: 0\nLast Upload: Never\nUpload every: 5s", UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
+	ui.statsLabel.TextSize = 12
+	ui.statsLabel.TextYAlignment = Enum.TextYAlignment.Top
+	ui.statsLabel.LayoutOrder = 2
+	ui.statsLabel.Parent = statsCard
+
+	ui.lastActionLabel = createLabel("Last action: Idle", UDim2.new(1, 0, 0, 34), theme.MutedText, Enum.Font.Gotham)
+	ui.lastActionLabel.TextSize = 12
+	ui.lastActionLabel.TextYAlignment = Enum.TextYAlignment.Top
+	ui.lastActionLabel.LayoutOrder = 3
+	ui.lastActionLabel.Parent = statsCard
+
+	ui.createSessionButton.MouseButton1Click:Connect(createSession)
+	ui.endSessionButton.MouseButton1Click:Connect(endSession)
+	ui.copyIdButton.MouseButton1Click:Connect(copySessionId)
+	ui.copySecretButton.MouseButton1Click:Connect(copySecret)
+	ui.copyLoginButton.MouseButton1Click:Connect(copyLoginBlock)
+	ui.revealSecretButton.MouseButton1Click:Connect(toggleSecretVisible)
+
+	ui.apiBaseUrlBox.FocusLost:Connect(function()
+		local value = normalizeBaseUrl(ui.apiBaseUrlBox.Text)
+
+		if value ~= "" then
+			apiConfig.BaseUrl = value
+			apiConfig.ConnectionMode = value == LOCAL_BASE_URL and "Local App" or "Custom"
+			setLastAction("API URL changed manually")
+			updateAllViews()
+		end
+	end)
+
+	ui.testApiButton.MouseButton1Click:Connect(function()
+		if not canSync() then
+			playPaused = true
+			setLastAction("API test blocked during Play Mode")
+			updateAllViews()
+			return
+		end
+
+		resolveBestBaseUrl(false)
+	end)
+
+	ui.manualRefreshButton.MouseButton1Click:Connect(manualRefreshNow)
+
+	updateAllViews()
+
+	task.spawn(function()
+		task.wait(0.5)
+		if canSync() and not session.Active then
+			resolveBestBaseUrl(true)
+		end
+	end)
+end
+
+local function updatePlayModePause()
+	local running = isPlayModeActive()
+
+	if running and not playPaused then
+		playPaused = true
+		networkBusy = false
+
+		if autoSync.Enabled then
+			autoSync.WasEnabledBeforePlay = true
+			autoSync.Enabled = false
+		end
+
+		setLastAction("Paused during Play Mode")
+		apiConfig.LastStatus = "Paused during Play Mode"
+		apiConfig.LastStatusColor = theme.Warning
+		updateAllViews()
+	elseif not running and playPaused then
+		playPaused = false
+		setLastAction("Play stopped")
+
+		if session.Active and autoSync.WasEnabledBeforePlay then
+			autoSync.WasEnabledBeforePlay = false
+			startAutomation()
+		else
+			updateAllViews()
+		end
+	end
+end
+
+button.Click:Connect(function()
+	widget.Enabled = not widget.Enabled
+end)
+
+widget:GetPropertyChangedSignal("Enabled"):Connect(function()
+	button:SetActive(widget.Enabled)
+end)
+
+task.spawn(function()
+	while true do
+		updatePlayModePause()
+		task.wait(0.25)
+	end
+end)
+
+buildWidget()
+button:SetActive(widget.Enabled)
