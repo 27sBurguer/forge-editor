@@ -25,10 +25,10 @@ local widgetInfo = DockWidgetPluginGuiInfo.new(
 	Enum.InitialDockState.Right,
 	false,
 	false,
-	430,
-	560,
+	420,
+	640,
 	360,
-	420
+	460
 )
 
 local widget = plugin:CreateDockWidgetPluginGui(WIDGET_ID, widgetInfo)
@@ -71,23 +71,27 @@ local playPaused = false
 local resolvingBaseUrl = false
 
 local theme = {
-	Background = Color3.fromRGB(11, 12, 16),
-	Surface = Color3.fromRGB(16, 18, 24),
-	Panel = Color3.fromRGB(19, 22, 30),
-	PanelDark = Color3.fromRGB(13, 15, 20),
-	PanelSoft = Color3.fromRGB(29, 33, 43),
-	PanelHover = Color3.fromRGB(37, 42, 55),
-	Text = Color3.fromRGB(238, 242, 248),
-	MutedText = Color3.fromRGB(145, 153, 168),
-	SubtleText = Color3.fromRGB(105, 114, 130),
-	AccentStrong = Color3.fromRGB(108, 92, 255),
-	AccentSoft = Color3.fromRGB(55, 48, 120),
-	AccentBlue = Color3.fromRGB(71, 142, 255),
-	Success = Color3.fromRGB(62, 188, 116),
-	Danger = Color3.fromRGB(231, 85, 93),
-	Warning = Color3.fromRGB(235, 184, 94),
-	Border = Color3.fromRGB(39, 44, 57),
-	BorderSoft = Color3.fromRGB(31, 36, 48),
+	Background = Color3.fromRGB(7, 10, 16),
+	BackgroundSoft = Color3.fromRGB(10, 14, 21),
+	Surface = Color3.fromRGB(14, 18, 28),
+	SurfaceRaised = Color3.fromRGB(17, 22, 34),
+	Panel = Color3.fromRGB(15, 20, 30),
+	PanelDark = Color3.fromRGB(10, 14, 21),
+	PanelSoft = Color3.fromRGB(25, 33, 48),
+	PanelHover = Color3.fromRGB(31, 40, 58),
+	Text = Color3.fromRGB(243, 247, 255),
+	MutedText = Color3.fromRGB(164, 175, 194),
+	SubtleText = Color3.fromRGB(112, 124, 146),
+	AccentStrong = Color3.fromRGB(88, 126, 255),
+	AccentSoft = Color3.fromRGB(52, 72, 145),
+	AccentCyan = Color3.fromRGB(106, 218, 255),
+	AccentViolet = Color3.fromRGB(143, 116, 255),
+	Success = Color3.fromRGB(69, 204, 134),
+	Danger = Color3.fromRGB(235, 91, 102),
+	Warning = Color3.fromRGB(245, 195, 92),
+	Border = Color3.fromRGB(32, 40, 56),
+	BorderSoft = Color3.fromRGB(27, 35, 49),
+	Cloud = Color3.fromRGB(222, 232, 255),
 }
 
 local ui = {}
@@ -196,6 +200,16 @@ local function createPadding(left, right, top, bottom)
 	})
 end
 
+local function createGradient(colorA, colorB, rotation)
+	return createInstance("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, colorA),
+			ColorSequenceKeypoint.new(1, colorB),
+		}),
+		Rotation = rotation or 0,
+	})
+end
+
 local function createLabel(text, size, color, font)
 	return createInstance("TextLabel", {
 		Size = size,
@@ -221,7 +235,7 @@ local function createButton(text, backgroundColor)
 		Font = Enum.Font.GothamMedium,
 		AutoButtonColor = true,
 	}, {
-		createCorner(12),
+		createCorner(13),
 		createStroke(theme.BorderSoft, 1, 0),
 	})
 end
@@ -238,7 +252,7 @@ local function createSmallButton(text, backgroundColor)
 		TextWrapped = true,
 		AutoButtonColor = true,
 	}, {
-		createCorner(11),
+		createCorner(12),
 		createStroke(theme.BorderSoft, 1, 0),
 	})
 end
@@ -555,18 +569,18 @@ local function updateSessionView()
 	end
 
 	if playPaused then
-		ui.statusLabel.Text = "Status: Paused during Play Mode"
+		ui.statusLabel.Text = "Paused"
 		ui.statusLabel.TextColor3 = theme.Warning
 	elseif session.Active then
-		ui.statusLabel.Text = "Status: Active"
+		ui.statusLabel.Text = "Active"
 		ui.statusLabel.TextColor3 = theme.Success
 	else
-		ui.statusLabel.Text = "Status: Offline"
+		ui.statusLabel.Text = "Offline"
 		ui.statusLabel.TextColor3 = theme.MutedText
 	end
 
 	if session.Active then
-		ui.autoSyncStatusLabel.Text = autoSync.Enabled and "Sync: Listening" or "Sync: Stopped"
+		ui.autoSyncStatusLabel.Text = autoSync.Enabled and "Listening" or "Stopped"
 		ui.autoSyncStatusLabel.TextColor3 = autoSync.Enabled and theme.Success or theme.MutedText
 		ui.sessionBox.Text = session.Id or "None"
 		ui.sessionBox.TextColor3 = theme.Text
@@ -580,7 +594,7 @@ local function updateSessionView()
 		ui.copyLoginButton.Visible = true
 		ui.revealSecretButton.Text = secretVisible and "Hide Secret" or "Reveal Secret"
 	else
-		ui.autoSyncStatusLabel.Text = "Sync: Stopped"
+		ui.autoSyncStatusLabel.Text = "Stopped"
 		ui.autoSyncStatusLabel.TextColor3 = theme.MutedText
 		ui.sessionBox.Text = "Not created"
 		ui.sessionBox.TextColor3 = theme.MutedText
@@ -593,6 +607,12 @@ local function updateSessionView()
 		ui.copySecretButton.Visible = false
 		ui.copyLoginButton.Visible = false
 	end
+
+	if ui.heroStatusPill then
+		ui.heroStatusPill.Text = session.Active and "Connected" or "Not Connected"
+		ui.heroStatusPill.BackgroundColor3 = session.Active and Color3.fromRGB(28, 76, 54) or theme.PanelSoft
+		ui.heroStatusPill.TextColor3 = session.Active and Color3.fromRGB(181, 255, 213) or theme.MutedText
+	end
 end
 
 local function updateApiView()
@@ -601,11 +621,11 @@ local function updateApiView()
 	end
 
 	ui.apiBaseUrlBox.Text = apiConfig.BaseUrl
-	ui.apiStatusLabel.Text = "API: " .. apiConfig.LastStatus
+	ui.apiStatusLabel.Text = apiConfig.LastStatus
 	ui.apiStatusLabel.TextColor3 = apiConfig.LastStatusColor or theme.MutedText
 
 	if ui.connectionModeLabel then
-		ui.connectionModeLabel.Text = "Mode: " .. tostring(apiConfig.ConnectionMode or "Auto")
+		ui.connectionModeLabel.Text = tostring(apiConfig.ConnectionMode or "Auto")
 	end
 end
 
@@ -617,12 +637,24 @@ local function updateStatsView()
 			"Items: " .. tostring(lastScanCount),
 			"Revision: " .. tostring(lastAppliedApiRevision),
 			"Last Upload: " .. uploadText,
-			"Upload every: " .. tostring(autoSync.UploadInterval) .. "s",
+			"Upload: " .. tostring(autoSync.UploadInterval) .. "s",
 		}, "\n")
 	end
 
 	if ui.lastActionLabel then
-		ui.lastActionLabel.Text = "Last action: " .. lastAction
+		ui.lastActionLabel.Text = lastAction
+	end
+
+	if ui.itemsMetric then
+		ui.itemsMetric.Text = tostring(lastScanCount)
+	end
+
+	if ui.revisionMetric then
+		ui.revisionMetric.Text = tostring(lastAppliedApiRevision)
+	end
+
+	if ui.uploadMetric then
+		ui.uploadMetric.Text = lastUploadAt and os.date("%H:%M:%S", lastUploadAt) or "Never"
 	end
 end
 
@@ -669,6 +701,8 @@ local function requestJsonAtBaseUrl(baseUrl, method, path, body, withAuth, maxAt
 		}
 
 		if withAuth then
+			headers["X-Cloud-Session"] = session.Id or ""
+			headers["X-Cloud-Secret"] = session.Secret or ""
 			headers["X-Forge-Session"] = session.Id or ""
 			headers["X-Forge-Secret"] = session.Secret or ""
 			headers["X-StudioBridge-Session"] = session.Id or ""
@@ -1783,7 +1817,6 @@ local function toggleSecretVisible()
 	updateAllViews()
 end
 
-
 local function createCard(parent, name, order)
 	local card = createInstance("Frame", {
 		Name = name,
@@ -1794,7 +1827,7 @@ local function createCard(parent, name, order)
 		LayoutOrder = order,
 		Parent = parent,
 	}, {
-		createCorner(18),
+		createCorner(20),
 		createStroke(theme.Border, 1, 0),
 		createPadding(14, 14, 14, 14),
 	})
@@ -1808,6 +1841,98 @@ local function createCard(parent, name, order)
 	return card
 end
 
+local function createCloudDecor(parent, anchorPoint, position, scale, transparency)
+	local width = math.floor(78 * scale)
+	local height = math.floor(42 * scale)
+
+	local holder = createInstance("Frame", {
+		Size = UDim2.new(0, width, 0, height),
+		AnchorPoint = anchorPoint,
+		Position = position,
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		Parent = parent,
+	})
+
+	local function bubble(size, posX, posY)
+		return createInstance("Frame", {
+			Size = UDim2.new(0, size, 0, size),
+			Position = UDim2.new(0, posX, 0, posY),
+			BackgroundColor3 = theme.Cloud,
+			BackgroundTransparency = transparency or 0.84,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+			Parent = holder,
+		}, {
+			createCorner(999),
+		})
+	end
+
+	bubble(math.floor(26 * scale), 0, math.floor(12 * scale))
+	bubble(math.floor(34 * scale), math.floor(18 * scale), 0)
+	bubble(math.floor(26 * scale), math.floor(40 * scale), math.floor(12 * scale))
+
+	createInstance("Frame", {
+		Size = UDim2.new(0, math.floor(58 * scale), 0, math.floor(18 * scale)),
+		Position = UDim2.new(0, math.floor(10 * scale), 0, math.floor(20 * scale)),
+		BackgroundColor3 = theme.Cloud,
+		BackgroundTransparency = transparency or 0.84,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = holder,
+	}, {
+		createCorner(999),
+	})
+
+	return holder
+end
+
+local function createFieldBlock(parent, title, text, order, height, multiline, editable)
+	local block = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = order,
+		Parent = parent,
+	})
+
+	createInstance("UIListLayout", {
+		Padding = UDim.new(0, 6),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = block,
+	})
+
+	local label = createLabel(title, UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.GothamMedium)
+	label.TextSize = 11
+	label.TextWrapped = false
+	label.TextTruncate = Enum.TextTruncate.AtEnd
+	label.LayoutOrder = 1
+	label.Parent = block
+
+	local box = createInstance("TextBox", {
+		Size = UDim2.new(1, 0, 0, height or 38),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		Text = text,
+		TextColor3 = theme.Text,
+		TextSize = multiline and 11 or 13,
+		Font = Enum.Font.Code,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
+		ClearTextOnFocus = false,
+		TextEditable = editable ~= false,
+		MultiLine = multiline == true,
+		LayoutOrder = 2,
+		Parent = block,
+	}, {
+		createCorner(14),
+		createStroke(theme.BorderSoft, 1, 0),
+		createPadding(11, 11, multiline and 9 or 0, multiline and 9 or 0),
+	})
+
+	return box
+end
+
 local function buildWidget()
 	widget:ClearAllChildren()
 	table.clear(ui)
@@ -1817,7 +1942,8 @@ local function buildWidget()
 		Size = UDim2.fromScale(1, 1),
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 5,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = theme.PanelSoft,
 		BackgroundColor3 = theme.Background,
 		BorderSizePixel = 0,
 		Parent = widget,
@@ -1825,13 +1951,23 @@ local function buildWidget()
 		createPadding(14, 14, 14, 14),
 	})
 
+	createGradient(theme.Background, theme.BackgroundSoft, 90).Parent = root
+
 	createInstance("UIListLayout", {
 		Padding = UDim.new(0, 12),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = root,
 	})
 
-	local function createRow(parent, height, order)
+	local function createStack(parent, padding)
+		return createInstance("UIListLayout", {
+			Padding = UDim.new(0, padding or 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = parent,
+		})
+	end
+
+	local function createRow(parent, height, order, padding)
 		local row = createInstance("Frame", {
 			Size = UDim2.new(1, 0, 0, height),
 			BackgroundTransparency = 1,
@@ -1841,7 +1977,7 @@ local function buildWidget()
 
 		createInstance("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 10),
+			Padding = UDim.new(0, padding or 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Parent = row,
@@ -1850,232 +1986,342 @@ local function buildWidget()
 		return row
 	end
 
-	local function createField(parent, title, text, order, height, multiline)
-		local label = createLabel(title, UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.GothamMedium)
-		label.TextSize = 11
-		label.LayoutOrder = order
-		label.Parent = parent
-
-		local box = createInstance("TextBox", {
-			Size = UDim2.new(1, 0, 0, height or 34),
-			BackgroundColor3 = theme.PanelDark,
+	local function createPanel(parent, name, order)
+		local panel = createInstance("Frame", {
+			Name = name,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = theme.Panel,
 			BorderSizePixel = 0,
-			Text = text,
-			TextColor3 = theme.Text,
-			TextSize = multiline and 11 or 13,
-			Font = Enum.Font.Code,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
-			ClearTextOnFocus = false,
-			TextEditable = true,
-			MultiLine = multiline == true,
-			LayoutOrder = order + 1,
+			LayoutOrder = order,
 			Parent = parent,
 		}, {
-			createCorner(12),
-			createStroke(theme.BorderSoft, 1, 0),
-			createPadding(10, 10, multiline and 8 or 0, multiline and 8 or 0),
+			createCorner(18),
+			createStroke(theme.Border, 1, 0),
+			createPadding(14, 14, 14, 14),
 		})
 
-		return box
+		createStack(panel, 10)
+		return panel
 	end
 
-	local function createInfoLine(parent, leftText, rightText, order)
-		local row = createInstance("Frame", {
-			Size = UDim2.new(1, 0, 0, 22),
+	local function createPanelHeader(parent, titleText, subtitleText, order)
+		local header = createInstance("Frame", {
+			Size = UDim2.new(1, 0, 0, subtitleText and 42 or 24),
 			BackgroundTransparency = 1,
 			LayoutOrder = order,
 			Parent = parent,
 		})
 
-		local left = createLabel(leftText, UDim2.new(0.45, 0, 1, 0), theme.MutedText, Enum.Font.GothamMedium)
-		left.TextSize = 12
-		left.Parent = row
+		local title = createLabel(titleText, UDim2.new(1, 0, 0, 22), theme.Text, Enum.Font.GothamBold)
+		title.TextSize = 15
+		title.TextWrapped = false
+		title.TextTruncate = Enum.TextTruncate.AtEnd
+		title.Parent = header
 
-		local right = createLabel(rightText, UDim2.new(0.55, 0, 1, 0), theme.Text, Enum.Font.Gotham)
-		right.TextSize = 12
-		right.TextXAlignment = Enum.TextXAlignment.Right
-		right.Parent = row
+		if subtitleText then
+			local subtitle = createLabel(subtitleText, UDim2.new(1, 0, 0, 18), theme.SubtleText, Enum.Font.Gotham)
+			subtitle.Position = UDim2.new(0, 0, 0, 22)
+			subtitle.TextSize = 11
+			subtitle.TextWrapped = false
+			subtitle.TextTruncate = Enum.TextTruncate.AtEnd
+			subtitle.Parent = header
+		end
 
-		return row
+		return header
 	end
 
-	local headerCard = createCard(root, "HeaderCard", 1)
-	headerCard.BackgroundColor3 = theme.Surface
+	local function createValueChip(parent, titleText, valueText, order, widthScale)
+		local chip = createInstance("Frame", {
+			Size = UDim2.new(widthScale or 0.5, -4, 1, 0),
+			BackgroundColor3 = theme.PanelDark,
+			BorderSizePixel = 0,
+			LayoutOrder = order,
+			Parent = parent,
+		}, {
+			createCorner(14),
+			createStroke(theme.BorderSoft, 1, 0),
+			createPadding(10, 10, 0, 0),
+		})
 
-	local headerRow = createInstance("Frame", {
-		Name = "HeaderRow",
-		Size = UDim2.new(1, 0, 0, 58),
+		local title = createLabel(titleText, UDim2.new(0.42, 0, 1, 0), theme.SubtleText, Enum.Font.GothamMedium)
+		title.TextSize = 11
+		title.TextWrapped = false
+		title.TextTruncate = Enum.TextTruncate.AtEnd
+		title.Parent = chip
+
+		local value = createLabel(valueText, UDim2.new(0.58, 0, 1, 0), theme.Text, Enum.Font.GothamBold)
+		value.TextSize = 11
+		value.TextXAlignment = Enum.TextXAlignment.Right
+		value.TextWrapped = false
+		value.TextTruncate = Enum.TextTruncate.AtEnd
+		value.Parent = chip
+
+		return value
+	end
+
+	local function createMetricCard(parent, titleText, valueText, order)
+		local card = createInstance("Frame", {
+			Size = UDim2.new(0.3333, -6, 0, 58),
+			BackgroundColor3 = theme.PanelDark,
+			BorderSizePixel = 0,
+			LayoutOrder = order,
+			Parent = parent,
+		}, {
+			createCorner(16),
+			createStroke(theme.BorderSoft, 1, 0),
+			createPadding(11, 11, 8, 8),
+		})
+
+		local value = createLabel(valueText, UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
+		value.TextSize = 16
+		value.TextWrapped = false
+		value.TextTruncate = Enum.TextTruncate.AtEnd
+		value.Parent = card
+
+		local title = createLabel(titleText, UDim2.new(1, 0, 0, 18), theme.SubtleText, Enum.Font.GothamMedium)
+		title.Position = UDim2.new(0, 0, 0, 28)
+		title.TextSize = 10
+		title.TextWrapped = false
+		title.TextTruncate = Enum.TextTruncate.AtEnd
+		title.Parent = card
+
+		return value
+	end
+
+	local function createActionButton(text, backgroundColor, textColor)
+		return createInstance("TextButton", {
+			Size = UDim2.new(1, 0, 0, 40),
+			BackgroundColor3 = backgroundColor,
+			BorderSizePixel = 0,
+			Text = text,
+			TextColor3 = textColor or theme.Text,
+			TextSize = 13,
+			Font = Enum.Font.GothamMedium,
+			AutoButtonColor = true,
+		}, {
+			createCorner(14),
+			createStroke(theme.BorderSoft, 1, 0),
+		})
+	end
+
+	local function createHalfButton(text, backgroundColor, textColor)
+		return createInstance("TextButton", {
+			Size = UDim2.new(0.5, -4, 1, 0),
+			BackgroundColor3 = backgroundColor,
+			BorderSizePixel = 0,
+			Text = text,
+			TextColor3 = textColor or theme.Text,
+			TextSize = 12,
+			Font = Enum.Font.GothamMedium,
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			AutoButtonColor = true,
+		}, {
+			createCorner(13),
+			createStroke(theme.BorderSoft, 1, 0),
+		})
+	end
+
+	local hero = createPanel(root, "Hero", 1)
+	hero.BackgroundColor3 = theme.SurfaceRaised
+	createGradient(Color3.fromRGB(16, 23, 38), Color3.fromRGB(9, 13, 21), 25).Parent = hero
+	createCloudDecor(hero, Vector2.new(1, 0), UDim2.new(1, -16, 0, 12), 0.9, 0.9)
+
+	local heroTop = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 68),
 		BackgroundTransparency = 1,
 		LayoutOrder = 1,
-		Parent = headerCard,
-	})
-
-	createInstance("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 12),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Parent = headerRow,
+		Parent = hero,
 	})
 
 	local iconWrap = createInstance("Frame", {
-		Size = UDim2.new(0, 50, 0, 50),
+		Size = UDim2.new(0, 56, 0, 56),
+		Position = UDim2.new(0, 0, 0, 6),
 		BackgroundColor3 = theme.PanelDark,
 		BorderSizePixel = 0,
-		LayoutOrder = 1,
-		Parent = headerRow,
+		Parent = heroTop,
 	}, {
-		createCorner(16),
+		createCorner(18),
 		createStroke(theme.Border, 1, 0),
 	})
 
+	createGradient(Color3.fromRGB(34, 46, 78), Color3.fromRGB(13, 17, 25), 45).Parent = iconWrap
+
 	createInstance("ImageLabel", {
-		Size = UDim2.new(1, -10, 1, -10),
-		Position = UDim2.new(0, 5, 0, 5),
+		Size = UDim2.new(1, -12, 1, -12),
+		Position = UDim2.new(0, 6, 0, 6),
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://136661669872868",
 		ScaleType = Enum.ScaleType.Fit,
 		Parent = iconWrap,
 	})
 
-	local headerText = createInstance("Frame", {
-		Size = UDim2.new(1, -62, 1, 0),
+	local heroText = createInstance("Frame", {
+		Size = UDim2.new(1, -68, 1, 0),
+		Position = UDim2.new(0, 68, 0, 0),
 		BackgroundTransparency = 1,
-		LayoutOrder = 2,
-		Parent = headerRow,
+		Parent = heroTop,
 	})
 
-	createInstance("UIListLayout", {
-		Padding = UDim.new(0, 2),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Parent = headerText,
+	local heroTitle = createLabel("Cloud", UDim2.new(1, -118, 0, 26), theme.Text, Enum.Font.GothamBold)
+	heroTitle.TextSize = 22
+	heroTitle.TextWrapped = false
+	heroTitle.TextTruncate = Enum.TextTruncate.AtEnd
+	heroTitle.Parent = heroText
+
+	ui.heroStatusPill = createInstance("TextLabel", {
+		Size = UDim2.new(0, 112, 0, 28),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		BackgroundColor3 = theme.PanelSoft,
+		BorderSizePixel = 0,
+		Text = "Not Connected",
+		TextColor3 = theme.MutedText,
+		TextSize = 11,
+		Font = Enum.Font.GothamMedium,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Parent = heroText,
+	}, {
+		createCorner(999),
+		createStroke(theme.BorderSoft, 1, 0),
 	})
 
-	local title = createLabel("Cloud", UDim2.new(1, 0, 0, 26), theme.Text, Enum.Font.GothamBold)
-	title.TextSize = 22
-	title.LayoutOrder = 1
-	title.Parent = headerText
+	local heroSubtitle = createLabel("Script workspace bridge for Cloud.", UDim2.new(1, 0, 0, 20), theme.MutedText, Enum.Font.Gotham)
+	heroSubtitle.Position = UDim2.new(0, 0, 0, 31)
+	heroSubtitle.TextSize = 12
+	heroSubtitle.TextWrapped = false
+	heroSubtitle.TextTruncate = Enum.TextTruncate.AtEnd
+	heroSubtitle.Parent = heroText
 
-	local subtitle = createLabel("Integrated development environment for Roblox.", UDim2.new(1, 0, 0, 28), theme.MutedText, Enum.Font.Gotham)
-	subtitle.TextSize = 12
-	subtitle.TextYAlignment = Enum.TextYAlignment.Top
-	subtitle.LayoutOrder = 2
-	subtitle.Parent = headerText
+	local heroHint = createLabel("Local app first. Cloud fallback. Pauses safely during Play Mode.", UDim2.new(1, 0, 0, 18), theme.SubtleText, Enum.Font.Gotham)
+	heroHint.Position = UDim2.new(0, 0, 0, 50)
+	heroHint.TextSize = 10
+	heroHint.TextWrapped = false
+	heroHint.TextTruncate = Enum.TextTruncate.AtEnd
+	heroHint.Parent = heroText
 
-	local sessionCard = createCard(root, "SessionCard", 2)
+	local metricsRow = createRow(hero, 58, 2, 8)
+	ui.itemsMetric = createMetricCard(metricsRow, "Items", "0", 1)
+	ui.revisionMetric = createMetricCard(metricsRow, "Revision", "0", 2)
+	ui.uploadMetric = createMetricCard(metricsRow, "Upload", "Never", 3)
 
-	local sessionHeader = createLabel("Session", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
-	sessionHeader.TextSize = 16
-	sessionHeader.LayoutOrder = 1
-	sessionHeader.Parent = sessionCard
+	local sessionCard = createPanel(root, "Session", 2)
+	createPanelHeader(sessionCard, "Session", "Create credentials and connect the editor.", 1)
 
-	ui.statusLabel = createLabel("Status: Offline", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
-	ui.statusLabel.TextSize = 12
-	ui.statusLabel.LayoutOrder = 2
-	ui.statusLabel.Parent = sessionCard
+	local statusRow = createRow(sessionCard, 38, 2, 8)
+	ui.statusLabel = createValueChip(statusRow, "Status", "Offline", 1)
+	ui.autoSyncStatusLabel = createValueChip(statusRow, "Sync", "Stopped", 2)
 
-	ui.autoSyncStatusLabel = createLabel("Sync: Stopped", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
-	ui.autoSyncStatusLabel.TextSize = 12
-	ui.autoSyncStatusLabel.LayoutOrder = 3
-	ui.autoSyncStatusLabel.Parent = sessionCard
+	ui.sessionBox = createFieldBlock(sessionCard, "Session ID", "Not created", 3, 38, false, false)
+	ui.secretBox = createFieldBlock(sessionCard, "Hidden Secret", "Not created", 4, 38, false, false)
+	ui.copyBox = createFieldBlock(sessionCard, "Selected Value", "Use a copy action, then press Ctrl+C.", 5, 70, true, true)
 
-	ui.sessionBox = createField(sessionCard, "Session ID", "Not created", 4, 34, false)
-	ui.secretBox = createField(sessionCard, "Hidden Secret", "Not created", 6, 34, false)
-	ui.copyBox = createField(sessionCard, "Copy Buffer", "Click Copy Session ID or Copy Secret, then press Ctrl+C.", 8, 62, true)
-
-	ui.createSessionButton = createButton("Create Session", theme.AccentStrong)
-	ui.createSessionButton.LayoutOrder = 10
+	ui.createSessionButton = createActionButton("Create Session", theme.AccentStrong)
+	ui.createSessionButton.LayoutOrder = 6
 	ui.createSessionButton.Parent = sessionCard
+	createGradient(theme.AccentStrong, theme.AccentViolet, 0).Parent = ui.createSessionButton
 
-	local copyButtons = createRow(sessionCard, 34, 11)
-	ui.copyIdButton = createSmallButton("Copy Session ID", theme.PanelSoft)
+	local copyButtons = createRow(sessionCard, 36, 7, 8)
+	ui.copyIdButton = createHalfButton("Copy ID", theme.PanelSoft)
 	ui.copyIdButton.LayoutOrder = 1
 	ui.copyIdButton.Parent = copyButtons
 
-	ui.copySecretButton = createSmallButton("Copy Secret", theme.PanelSoft)
+	ui.copySecretButton = createHalfButton("Copy Secret", theme.PanelSoft)
 	ui.copySecretButton.LayoutOrder = 2
 	ui.copySecretButton.Parent = copyButtons
 
-	local secondButtons = createRow(sessionCard, 34, 12)
-	ui.revealSecretButton = createSmallButton("Reveal Secret", theme.PanelSoft)
+	local secondButtons = createRow(sessionCard, 36, 8, 8)
+	ui.revealSecretButton = createHalfButton("Reveal Secret", theme.PanelSoft)
 	ui.revealSecretButton.LayoutOrder = 1
 	ui.revealSecretButton.Parent = secondButtons
 
-	ui.copyLoginButton = createSmallButton("Copy Login Block", theme.PanelSoft)
+	ui.copyLoginButton = createHalfButton("Copy Login", theme.PanelSoft)
 	ui.copyLoginButton.LayoutOrder = 2
 	ui.copyLoginButton.Parent = secondButtons
 
-	local endButtons = createRow(sessionCard, 34, 13)
-	ui.endSessionButton = createSmallButton("End Session", theme.Danger)
+	local endButtons = createRow(sessionCard, 36, 9, 8)
+	ui.endSessionButton = createHalfButton("End Session", theme.Danger)
 	ui.endSessionButton.LayoutOrder = 1
 	ui.endSessionButton.Parent = endButtons
 
-	local playModeNote = createSmallButton("Auto-pauses on Play", theme.PanelDark)
+	local playModeNote = createHalfButton("Pauses on Play", theme.PanelDark, theme.MutedText)
 	playModeNote.LayoutOrder = 2
-	playModeNote.TextColor3 = theme.MutedText
 	playModeNote.AutoButtonColor = false
 	playModeNote.Parent = endButtons
 
-	local apiCard = createCard(root, "ConnectionCard", 3)
+	local apiCard = createPanel(root, "Connection", 3)
+	createPanelHeader(apiCard, "Connection", "Auto-detects local app before cloud mode.", 1)
 
-	local apiTitle = createLabel("Connection", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
-	apiTitle.TextSize = 16
-	apiTitle.LayoutOrder = 1
-	apiTitle.Parent = apiCard
+	local connectionRow = createRow(apiCard, 38, 2, 8)
+	ui.connectionModeLabel = createValueChip(connectionRow, "Mode", "Cloud", 1)
+	ui.apiStatusLabel = createValueChip(connectionRow, "API", "Not connected", 2)
 
-	ui.apiStatusLabel = createLabel("API: Not connected", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
-	ui.apiStatusLabel.TextSize = 12
-	ui.apiStatusLabel.LayoutOrder = 2
-	ui.apiStatusLabel.Parent = apiCard
+	ui.apiBaseUrlBox = createFieldBlock(apiCard, "Endpoint", apiConfig.BaseUrl, 3, 38, false, true)
 
-	ui.connectionModeLabel = createLabel("Mode: Auto", UDim2.new(1, 0, 0, 20), theme.MutedText, Enum.Font.Gotham)
-	ui.connectionModeLabel.TextSize = 12
-	ui.connectionModeLabel.LayoutOrder = 3
-	ui.connectionModeLabel.Parent = apiCard
-
-	ui.apiBaseUrlBox = createField(apiCard, "Endpoint", apiConfig.BaseUrl, 4, 34, false)
-
-	local apiButtons = createRow(apiCard, 34, 6)
-	ui.testApiButton = createSmallButton("Detect API", theme.PanelSoft)
+	local apiButtons = createRow(apiCard, 36, 4, 8)
+	ui.testApiButton = createHalfButton("Detect API", theme.PanelSoft)
 	ui.testApiButton.LayoutOrder = 1
 	ui.testApiButton.Parent = apiButtons
 
-	ui.manualRefreshButton = createSmallButton("Sync Now", theme.Warning)
-	ui.manualRefreshButton.TextColor3 = Color3.fromRGB(20, 20, 24)
+	ui.manualRefreshButton = createHalfButton("Sync Now", theme.Warning, Color3.fromRGB(24, 24, 30))
 	ui.manualRefreshButton.LayoutOrder = 2
 	ui.manualRefreshButton.Parent = apiButtons
 
-	local hint = createLabel("Cloud prefers the local desktop app. If it is closed, cloud mode is used automatically.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
-	hint.TextSize = 12
-	hint.TextYAlignment = Enum.TextYAlignment.Top
-	hint.LayoutOrder = 7
-	hint.Parent = apiCard
+	local hint = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 44),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		LayoutOrder = 5,
+		Parent = apiCard,
+	}, {
+		createCorner(14),
+		createStroke(theme.BorderSoft, 1, 0),
+		createPadding(11, 11, 0, 0),
+	})
 
-	local statsCard = createCard(root, "StatusCard", 4)
+	local hintText = createLabel("Cloud keeps your editor linked while the local app or web service is available.", UDim2.new(1, 0, 1, 0), theme.MutedText, Enum.Font.Gotham)
+	hintText.TextSize = 11
+	hintText.TextYAlignment = Enum.TextYAlignment.Center
+	hintText.Parent = hint
 
-	local statsTitle = createLabel("Live Status", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
-	statsTitle.TextSize = 16
-	statsTitle.LayoutOrder = 1
-	statsTitle.Parent = statsCard
+	local activityCard = createPanel(root, "Activity", 4)
+	createPanelHeader(activityCard, "Activity", "Current sync state and last operation.", 1)
 
 	ui.statsLabel = createLabel(table.concat({
 		"Items: 0",
 		"Revision: 0",
 		"Last Upload: Never",
-		"Upload every: 5s",
-	}, "\n"), UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
+		"Upload: 5s",
+	}, "\n"), UDim2.new(1, 0, 0, 76), theme.MutedText, Enum.Font.Code)
 	ui.statsLabel.TextSize = 12
 	ui.statsLabel.TextYAlignment = Enum.TextYAlignment.Top
 	ui.statsLabel.LayoutOrder = 2
-	ui.statsLabel.Parent = statsCard
+	ui.statsLabel.Parent = activityCard
 
-	ui.lastActionLabel = createLabel("Last action: Idle", UDim2.new(1, 0, 0, 34), theme.MutedText, Enum.Font.Gotham)
-	ui.lastActionLabel.TextSize = 12
-	ui.lastActionLabel.TextYAlignment = Enum.TextYAlignment.Top
-	ui.lastActionLabel.LayoutOrder = 3
-	ui.lastActionLabel.Parent = statsCard
+	local lastActionBox = createInstance("Frame", {
+		Size = UDim2.new(1, 0, 0, 42),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		LayoutOrder = 3,
+		Parent = activityCard,
+	}, {
+		createCorner(14),
+		createStroke(theme.BorderSoft, 1, 0),
+		createPadding(11, 11, 0, 0),
+	})
+
+	local lastActionTitle = createLabel("Last action", UDim2.new(0.34, 0, 1, 0), theme.SubtleText, Enum.Font.GothamMedium)
+	lastActionTitle.TextSize = 11
+	lastActionTitle.TextWrapped = false
+	lastActionTitle.Parent = lastActionBox
+
+	ui.lastActionLabel = createLabel("Idle", UDim2.new(0.66, 0, 1, 0), theme.Text, Enum.Font.GothamMedium)
+	ui.lastActionLabel.TextSize = 11
+	ui.lastActionLabel.TextXAlignment = Enum.TextXAlignment.Right
+	ui.lastActionLabel.TextWrapped = false
+	ui.lastActionLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	ui.lastActionLabel.Parent = lastActionBox
 
 	ui.createSessionButton.MouseButton1Click:Connect(createSession)
 	ui.endSessionButton.MouseButton1Click:Connect(endSession)

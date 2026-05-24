@@ -585,6 +585,43 @@ function expandExplorer() {
 	setStatus("Explorer expanded.", "success");
 }
 
+
+const UI_ZOOM_STORAGE = "Cloud.UiZoom";
+let uiZoom = clamp(Number(localStorage.getItem(UI_ZOOM_STORAGE)) || 1, 0.75, 1.7);
+
+function applyUiZoom(showFeedback = false) {
+	document.body.style.zoom = String(uiZoom);
+	try { localStorage.setItem(UI_ZOOM_STORAGE, String(uiZoom)); } catch (error) {}
+	if (showFeedback) showToast("Zoom " + Math.round(uiZoom * 100) + "%", "success");
+}
+
+function handleZoomShortcut(event) {
+	const mod = event.ctrlKey || event.metaKey;
+	if (!mod || event.altKey) return false;
+
+	const key = String(event.key || "").toLowerCase();
+	const code = String(event.code || "").toLowerCase();
+	const zoomIn = key === "+" || key === "=" || code === "equal" || code === "numpadadd";
+	const zoomOut = key === "-" || code === "minus" || code === "numpadsubtract";
+	const zoomReset = key === "0" || code === "digit0" || code === "numpad0";
+
+	if (!zoomIn && !zoomOut && !zoomReset) return false;
+
+	event.preventDefault();
+	event.stopPropagation();
+	if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+
+	if (zoomIn) uiZoom = clamp(Number((uiZoom + 0.1).toFixed(2)), 0.75, 1.7);
+	if (zoomOut) uiZoom = clamp(Number((uiZoom - 0.1).toFixed(2)), 0.75, 1.7);
+	if (zoomReset) uiZoom = 1;
+
+	applyUiZoom(true);
+	setTimeout(() => {
+		if (state.editor) state.editor.layout();
+	}, 60);
+	return true;
+}
+
 function switchTabByShortcutIndex(index) {
 	const tabIds = Array.from(state.openTabs.keys());
 	const fileId = tabIds[index - 1];
@@ -599,6 +636,8 @@ function switchTabByShortcutIndex(index) {
 }
 
 function handleGlobalShortcut(event) {
+	if (handleZoomShortcut(event)) return true;
+
 	const key = String(event.key || "").toLowerCase();
 	const code = event.code || "";
 	const mod = event.ctrlKey || event.metaKey;
@@ -2183,6 +2222,7 @@ function bindEvents() {
 }
 
 function bootEditor() {
+	applyUiZoom(false);
 	state.editor = createEditorController({
 		host: refs.monacoHost,
 		fallback: refs.fallbackEditor,

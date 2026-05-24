@@ -789,3 +789,253 @@ textarea:focus { border-color: color-mix(in srgb, var(--accent) 65%, white 15%);
 	.tab { min-width: 128px; }
 	.modal-backdrop { padding: 10px; }
 }
+
+
+/* Cloud v1.1.4 responsive scale and motion pass */
+html {
+	text-size-adjust: 100%;
+}
+
+html,
+body {
+	min-width: 0;
+}
+
+body,
+.app,
+.session-gate,
+.modal-backdrop,
+.tree-row,
+.tab,
+.icon-button,
+.primary-button,
+.secondary-button,
+.download-app-button,
+.roblox-plugin-button,
+.session-gate-actions a,
+input,
+select,
+textarea {
+	transition-property: background-color, border-color, color, opacity, transform, box-shadow, filter;
+	transition-duration: 180ms;
+	transition-timing-function: cubic-bezier(.2, .8, .2, 1);
+}
+
+body.workspace-ready .app {
+	animation: cloudWorkspaceIn 260ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.session-gate {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: clamp(18px, 3vw, 38px);
+	min-height: 100dvh;
+}
+
+.session-gate-shell {
+	width: min(1180px, calc(100vw - clamp(32px, 6vw, 76px)));
+	max-width: 1180px;
+	min-width: 0;
+	animation: cloudGateIn 280ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.session-gate-content {
+	align-items: stretch;
+	grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+}
+
+.session-hero-card,
+.session-login-card,
+.modal.open,
+.toast {
+	will-change: transform, opacity;
+}
+
+.session-hero-card {
+	min-height: clamp(420px, 54vh, 620px);
+}
+
+.session-login-card {
+	justify-content: flex-start;
+	min-height: clamp(420px, 54vh, 620px);
+	padding: clamp(22px, 2.6vw, 30px);
+}
+
+.login-cloud-panel {
+	display: grid;
+	grid-template-columns: 54px minmax(0, 1fr);
+	align-items: center;
+	gap: 12px;
+	padding: 13px;
+	margin: 4px 0 6px;
+	border: 1px solid var(--border);
+	border-radius: 18px;
+	background:
+		radial-gradient(circle at 18% 24%, rgba(124, 102, 255, .22), transparent 36%),
+		linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)),
+		var(--bg-soft);
+}
+
+.login-cloud-orb {
+	width: 54px;
+	height: 54px;
+	display: grid;
+	place-items: center;
+	border-radius: 18px;
+	background: color-mix(in srgb, var(--panel-3) 78%, var(--accent) 22%);
+	border: 1px solid var(--border-strong);
+	box-shadow: 0 12px 32px rgba(0,0,0,.22);
+}
+
+.login-cloud-orb img {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+}
+
+.login-cloud-copy {
+	min-width: 0;
+	display: grid;
+	gap: 4px;
+}
+
+.login-cloud-copy strong {
+	font-size: 14px;
+	color: var(--text-strong);
+}
+
+.login-cloud-copy span {
+	font-size: 12px;
+	line-height: 1.35;
+	color: var(--muted);
+}
+
+.login-sync-steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 7px;
+	margin-bottom: 8px;
+}
+
+.login-sync-steps span {
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 9px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--bg-soft);
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 750;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.login-sync-steps i {
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: var(--accent-2);
+	flex: 0 0 auto;
+}
+
+.gate-connect-button,
+.primary-button {
+	box-shadow: 0 10px 26px rgba(74, 141, 255, .18);
+}
+
+.gate-connect-button:hover,
+.primary-button:hover:not(:disabled) {
+	transform: translateY(-1px);
+	box-shadow: 0 15px 34px rgba(74, 141, 255, .24);
+}
+
+.secondary-button:hover:not(:disabled),
+.session-gate-actions a:hover,
+.download-app-button:hover,
+.roblox-plugin-button:hover,
+.icon-button:hover,
+.tab:hover,
+.tree-row:hover {
+	transform: translateY(-1px);
+}
+
+.modal-backdrop.open .modal {
+	animation: cloudModalIn 190ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.toast {
+	animation: cloudToastIn 170ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.cloud-window-preview,
+.session-feature-grid div,
+.login-cloud-panel,
+.session-login-card,
+.session-hero-card {
+	box-shadow: 0 18px 54px rgba(0,0,0,.18);
+}
+
+@keyframes cloudGateIn {
+	from { opacity: 0; transform: translateY(12px) scale(.985); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cloudWorkspaceIn {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cloudModalIn {
+	from { opacity: 0; transform: translateY(10px) scale(.985); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cloudToastIn {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 1440px) {
+	.session-gate-shell { width: min(1220px, 78vw); }
+	.session-hero-card h1 { font-size: clamp(52px, 4.9vw, 78px); }
+}
+
+@media (max-width: 980px) {
+	.session-gate {
+		align-items: flex-start;
+	}
+	.session-gate-shell {
+		width: min(760px, calc(100vw - 28px));
+	}
+	.session-gate-content {
+		grid-template-columns: 1fr;
+	}
+	.session-login-card,
+	.session-hero-card {
+		min-height: auto;
+	}
+}
+
+@media (max-width: 560px) {
+	.session-gate { padding: 12px; }
+	.session-gate-shell { width: 100%; }
+	.login-sync-steps { grid-template-columns: 1fr; }
+	.session-login-card { padding: 18px; }
+	.login-cloud-panel { grid-template-columns: 44px minmax(0, 1fr); }
+	.login-cloud-orb { width: 44px; height: 44px; border-radius: 15px; }
+	.login-cloud-orb img { width: 32px; height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}

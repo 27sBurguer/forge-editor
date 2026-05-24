@@ -411,6 +411,12 @@ export function createEditorController(options) {
 				target.editor.focus();
 			}
 		},
+		layout() {
+			for (const groupName of Object.keys(groups)) {
+				const editor = groups[groupName].editor;
+				if (editor) editor.layout();
+			}
+		},
 		setSplit(enabled) {
 			this.isSplit = !!enabled;
 			if (options.shell) options.shell.classList.toggle("split", this.isSplit);

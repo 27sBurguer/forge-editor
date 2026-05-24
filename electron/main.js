@@ -19,6 +19,9 @@ const FORGE_WEB_URL = "https://forge-editor.onrender.com";
 const FORGE_DOWNLOAD_URL = "https://github.com/27sBurguer/forge-editor/releases/latest";
 const ROBLOX_PLUGIN_URL = "https://create.roblox.com/store/asset/110405258188669/Forge-Codex";
 const activityStartedAt = new Date();
+const MIN_ZOOM_FACTOR = 0.7;
+const MAX_ZOOM_FACTOR = 1.7;
+const ZOOM_STEP = 0.1;
 
 let mainWindow = null;
 let serverHandle = null;
@@ -27,6 +30,51 @@ let discordClient = null;
 let discordReady = false;
 let queuedDiscordActivity = null;
 let lastDiscordSignature = "";
+
+function clampZoomFactor(value) {
+	const number = Number(value) || 1;
+	return Math.max(MIN_ZOOM_FACTOR, Math.min(MAX_ZOOM_FACTOR, Number(number.toFixed(2))));
+}
+
+function setMainWindowZoom(nextZoom) {
+	if (!mainWindow || mainWindow.isDestroyed()) return;
+	const zoom = clampZoomFactor(nextZoom);
+	mainWindow.webContents.setZoomFactor(zoom);
+	mainWindow.webContents.send("cloud:zoom-change", { zoom });
+}
+
+function bindWindowShortcuts() {
+	if (!mainWindow || mainWindow.isDestroyed()) return;
+
+	mainWindow.webContents.on("before-input-event", (event, input) => {
+		if (!input || input.type !== "keyDown") return;
+		if (!input.control && !input.meta) return;
+
+		const key = String(input.key || "").toLowerCase();
+		const code = String(input.code || "").toLowerCase();
+		const currentZoom = mainWindow.webContents.getZoomFactor();
+		const isZoomIn = key === "+" || key === "=" || code === "equal" || code === "numpadadd";
+		const isZoomOut = key === "-" || code === "minus" || code === "numpadsubtract";
+		const isZoomReset = key === "0" || code === "digit0" || code === "numpad0";
+
+		if (isZoomIn) {
+			event.preventDefault();
+			setMainWindowZoom(currentZoom + ZOOM_STEP);
+			return;
+		}
+
+		if (isZoomOut) {
+			event.preventDefault();
+			setMainWindowZoom(currentZoom - ZOOM_STEP);
+			return;
+		}
+
+		if (isZoomReset) {
+			event.preventDefault();
+			setMainWindowZoom(1);
+		}
+	});
+}
 
 function getAppUrl() {
 	return `http://${APP_HOST}:${APP_PORT}`;
@@ -182,6 +230,11 @@ async function createWindow() {
 		return { action: "deny" };
 	});
 
+	mainWindow.webContents.once("did-finish-load", () => {
+		setMainWindowZoom(1);
+	});
+
+	bindWindowShortcuts();
 	await mainWindow.loadURL(getAppUrl());
 }
 
