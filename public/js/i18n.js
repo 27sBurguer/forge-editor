@@ -25,9 +25,13 @@ export const TRANSLATIONS = {
 		save: "Save",
 		ready: "Ready",
 		footerHelp: "Ctrl+W close tab · Ctrl+1-9 switch tabs · Ctrl+Shift+E fold script · Ctrl+E unfold script",
-		connectionTitle: "Private Connection",
-		secureTitle: "Session data is hidden from the sidebar.",
-		secureText: "The server checks the secret before reading, saving, moving or deleting files.",
+		connectionTitle: "Connection",
+		secureTitle: "Connect to your workspace.",
+		secureText: "Your session ID and secret are required before Cloud can read or save files.",
+		connectedKicker: "Workspace connected",
+		connectedTitle: "Cloud is ready",
+		connectedHelp: "Use Forget only when you want to disconnect this browser from the current session.",
+		done: "Done",
 		sessionId: "Session ID",
 		sessionSecret: "Session Secret",
 		pasteSessionId: "Paste session ID",
@@ -79,9 +83,13 @@ export const TRANSLATIONS = {
 		save: "Salvar",
 		ready: "Pronto",
 		footerHelp: "Ctrl+W fecha aba · Ctrl+1-9 troca abas · Ctrl+Shift+E compacta script · Ctrl+E expande script",
-		connectionTitle: "Conexão privada",
-		secureTitle: "Os dados da sessão ficam ocultos na barra lateral.",
-		secureText: "O servidor verifica o segredo antes de ler, salvar, mover ou excluir arquivos.",
+		connectionTitle: "Conexão",
+		secureTitle: "Conecte ao seu workspace.",
+		secureText: "O ID da sessão e o segredo são necessários antes do Cloud ler ou salvar arquivos.",
+		connectedKicker: "Workspace conectado",
+		connectedTitle: "Cloud está pronto",
+		connectedHelp: "Use Esquecer apenas quando quiser desconectar este navegador da sessão atual.",
+		done: "Pronto",
 		sessionId: "ID da sessão",
 		sessionSecret: "Segredo da sessão",
 		pasteSessionId: "Cole o ID da sessão",
@@ -133,9 +141,13 @@ export const TRANSLATIONS = {
 		save: "Guardar",
 		ready: "Listo",
 		footerHelp: "Ctrl+W cerrar pestaña · Ctrl+1-9 cambiar pestañas · Ctrl+Shift+E plegar script · Ctrl+E desplegar script",
-		connectionTitle: "Conexión privada",
-		secureTitle: "Los datos de sesión están ocultos en la barra lateral.",
-		secureText: "El servidor verifica el secreto antes de leer, guardar, mover o eliminar archivos.",
+		connectionTitle: "Conexión",
+		secureTitle: "Conecta tu workspace.",
+		secureText: "El ID y el secreto son necesarios antes de que Cloud pueda leer o guardar archivos.",
+		connectedKicker: "Workspace conectado",
+		connectedTitle: "Cloud está listo",
+		connectedHelp: "Usa Olvidar solo cuando quieras desconectar este navegador de la sesión actual.",
+		done: "Listo",
 		sessionId: "ID de sesión",
 		sessionSecret: "Secreto de sesión",
 		pasteSessionId: "Pega el ID de sesión",
@@ -187,9 +199,13 @@ export const TRANSLATIONS = {
 		save: "Enregistrer",
 		ready: "Prêt",
 		footerHelp: "Ctrl+W fermer l’onglet · Ctrl+1-9 changer d’onglet · Ctrl+Shift+E plier le script · Ctrl+E déplier le script",
-		connectionTitle: "Connexion privée",
-		secureTitle: "Les données de session sont masquées dans la barre latérale.",
-		secureText: "Le serveur vérifie le secret avant de lire, enregistrer, déplacer ou supprimer des fichiers.",
+		connectionTitle: "Connexion",
+		secureTitle: "Connectez votre workspace.",
+		secureText: "L’ID de session et le secret sont nécessaires avant que Cloud puisse lire ou enregistrer des fichiers.",
+		connectedKicker: "Workspace connecté",
+		connectedTitle: "Cloud est prêt",
+		connectedHelp: "Utilisez Oublier uniquement pour déconnecter ce navigateur de la session actuelle.",
+		done: "Terminé",
 		sessionId: "ID de session",
 		sessionSecret: "Secret de session",
 		pasteSessionId: "Collez l’ID de session",
@@ -241,9 +257,13 @@ export const TRANSLATIONS = {
 		save: "Speichern",
 		ready: "Bereit",
 		footerHelp: "Ctrl+W Tab schließen · Ctrl+1-9 Tabs wechseln · Ctrl+Shift+E Script einklappen · Ctrl+E ausklappen",
-		connectionTitle: "Private Verbindung",
-		secureTitle: "Sitzungsdaten sind in der Seitenleiste verborgen.",
-		secureText: "Der Server prüft das Secret vor dem Lesen, Speichern, Verschieben oder Löschen von Dateien.",
+		connectionTitle: "Verbindung",
+		secureTitle: "Verbinde deinen Workspace.",
+		secureText: "Sitzungs-ID und Secret werden benötigt, bevor Cloud Dateien lesen oder speichern kann.",
+		connectedKicker: "Workspace verbunden",
+		connectedTitle: "Cloud ist bereit",
+		connectedHelp: "Nutze Vergessen nur, wenn du diesen Browser von der aktuellen Sitzung trennen möchtest.",
+		done: "Fertig",
 		sessionId: "Sitzungs-ID",
 		sessionSecret: "Sitzungs-Secret",
 		pasteSessionId: "Sitzungs-ID einfügen",
@@ -343,12 +363,15 @@ export function applyLanguage(language) {
 	setText("#connectionModal .modal-title", t(lang, "connectionTitle"));
 	setText("#connectionModal .secure-note strong", t(lang, "secureTitle"));
 	setText("#connectionModal .secure-note span", t(lang, "secureText"));
+	setText("#connectedSessionPanel .connection-kicker", t(lang, "connectedKicker"));
+	setText("#connectedSessionPanel .connected-session-card strong", t(lang, "connectedTitle"));
+	setText("#connectedSessionPanel .connection-helper", t(lang, "connectedHelp"));
 	setText('label[for="sessionInput"]', t(lang, "sessionId"));
 	setText('label[for="secretInput"]', t(lang, "sessionSecret"));
 	setPlaceholder("#sessionInput", t(lang, "pasteSessionId"));
 	setPlaceholder("#secretInput", t(lang, "pasteSessionSecret"));
 	setText("#disconnectButton", t(lang, "forget"));
-	setText("#cancelConnectionButton", t(lang, "cancel"));
+	setText("#cancelConnectionButton", document.querySelector("#connectionDialog.connected") ? t(lang, "done") : t(lang, "cancel"));
 	setText("#loadButton", t(lang, "connect"));
 	setText("#createModal .modal-title", t(lang, "newInstance"));
 	setText('label[for="createNameInput"]', t(lang, "name"));

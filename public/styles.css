@@ -1756,3 +1756,106 @@ html[data-interface-theme="light"] .monaco-editor,
 html[data-interface-theme="system"] .monaco-editor {
 	transition: background 0.16s ease;
 }
+
+
+.connection-form-panel {
+	display: grid;
+	gap: 12px;
+}
+
+.connected-session-panel {
+	display: none;
+	gap: 12px;
+}
+
+.connected-session-card {
+	display: grid;
+	gap: 7px;
+	padding: 18px;
+	border-radius: 18px;
+	background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 72%, transparent), var(--surface-1));
+	border: 1px solid var(--border-subtle);
+}
+
+.connection-kicker {
+	width: fit-content;
+	padding: 5px 9px;
+	border-radius: 999px;
+	background: var(--accent-soft);
+	color: color-mix(in srgb, var(--accent) 72%, var(--text-strong));
+	font-size: 11px;
+	font-weight: 800;
+}
+
+.connected-session-card strong {
+	font-size: 20px;
+	letter-spacing: -0.02em;
+	color: var(--text-strong);
+}
+
+.connected-session-card span:last-child,
+.connection-helper {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.connection-modal.connected .connection-form-panel,
+.connection-modal.connected #loadButton {
+	display: none;
+}
+
+.connection-modal.connected .connected-session-panel {
+	display: grid;
+}
+
+.connection-modal:not(.connected) #disconnectButton,
+.connection-modal:not(.connected) .connected-session-panel {
+	display: none;
+}
+
+.connection-modal.connected .modal-actions {
+	padding-top: 2px;
+}
+
+.connection-modal .modal-head {
+	background: color-mix(in srgb, var(--surface-1) 94%, transparent) !important;
+}
+
+.connection-modal .secure-note {
+	border-radius: 16px !important;
+	padding: 14px !important;
+}
+
+.session-hero-card h1 {
+	font-size: clamp(38px, 6vw, 68px) !important;
+	letter-spacing: -0.06em !important;
+}
+
+.session-hero-card,
+.session-login-card,
+.placeholder-card,
+.modal {
+	box-shadow: 0 28px 84px rgba(0, 0, 0, 0.34) !important;
+}
+
+.session-feature-grid div,
+.connection-card,
+.status.compact {
+	border-radius: 18px !important;
+}
+
+.session-gate-actions a,
+.download-app-button,
+.roblox-plugin-button,
+.secondary-button,
+.primary-button,
+.gate-connect-button {
+	font-weight: 760 !important;
+}
+
+html[data-interface-theme="light"] .session-gate,
+html[data-interface-theme="light"] .modal-backdrop {
+	background: rgba(246, 247, 251, 0.78) !important;
+}

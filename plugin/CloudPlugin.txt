@@ -13,12 +13,13 @@ local AUTO_UPLOAD_INTERVAL = 5
 local MAX_REQUEST_ATTEMPTS = 2
 local REQUEST_RETRY_DELAY = 0.35
 local REQUEST_TIMEOUT_TEXT = "Check if the Cloud server is running and reachable."
-local ITEM_ID_ATTRIBUTE = "ForgeItemId"
-local LEGACY_ITEM_ID_ATTRIBUTE = "StudioBridgeItemId"
+local ITEM_ID_ATTRIBUTE = "CloudItemId"
+local LEGACY_ITEM_ID_ATTRIBUTE = "ForgeItemId"
+local OLD_LEGACY_ITEM_ID_ATTRIBUTE = "StudioBridgeItemId"
 local SECRET_HIDDEN_TEXT = "Hidden - click Copy Secret"
 
 local toolbar = plugin:CreateToolbar(PLUGIN_NAME)
-local button = toolbar:CreateButton("Cloud_Open", "Open Cloud", "rbxassetid://9322329870", "Cloud")
+local button = toolbar:CreateButton("Cloud_Open", "Open Cloud", "rbxassetid://136661669872868", "Cloud")
 
 local widgetInfo = DockWidgetPluginGuiInfo.new(
 	Enum.InitialDockState.Right,
@@ -70,17 +71,23 @@ local playPaused = false
 local resolvingBaseUrl = false
 
 local theme = {
-	Background = Color3.fromRGB(15, 15, 15),
-	Panel = Color3.fromRGB(24, 24, 24),
-	PanelDark = Color3.fromRGB(18, 18, 18),
-	PanelSoft = Color3.fromRGB(35, 35, 35),
-	Text = Color3.fromRGB(232, 232, 232),
-	MutedText = Color3.fromRGB(150, 150, 150),
-	AccentStrong = Color3.fromRGB(64, 156, 255),
-	Success = Color3.fromRGB(87, 171, 90),
-	Danger = Color3.fromRGB(190, 68, 68),
-	Warning = Color3.fromRGB(215, 186, 125),
-	Border = Color3.fromRGB(48, 48, 48),
+	Background = Color3.fromRGB(11, 12, 16),
+	Surface = Color3.fromRGB(16, 18, 24),
+	Panel = Color3.fromRGB(19, 22, 30),
+	PanelDark = Color3.fromRGB(13, 15, 20),
+	PanelSoft = Color3.fromRGB(29, 33, 43),
+	PanelHover = Color3.fromRGB(37, 42, 55),
+	Text = Color3.fromRGB(238, 242, 248),
+	MutedText = Color3.fromRGB(145, 153, 168),
+	SubtleText = Color3.fromRGB(105, 114, 130),
+	AccentStrong = Color3.fromRGB(108, 92, 255),
+	AccentSoft = Color3.fromRGB(55, 48, 120),
+	AccentBlue = Color3.fromRGB(71, 142, 255),
+	Success = Color3.fromRGB(62, 188, 116),
+	Danger = Color3.fromRGB(231, 85, 93),
+	Warning = Color3.fromRGB(235, 184, 94),
+	Border = Color3.fromRGB(39, 44, 57),
+	BorderSoft = Color3.fromRGB(31, 36, 48),
 }
 
 local ui = {}
@@ -205,7 +212,7 @@ end
 
 local function createButton(text, backgroundColor)
 	return createInstance("TextButton", {
-		Size = UDim2.new(1, 0, 0, 36),
+		Size = UDim2.new(1, 0, 0, 38),
 		BackgroundColor3 = backgroundColor,
 		BorderSizePixel = 0,
 		Text = text,
@@ -214,24 +221,25 @@ local function createButton(text, backgroundColor)
 		Font = Enum.Font.GothamMedium,
 		AutoButtonColor = true,
 	}, {
-		createCorner(10),
-		createStroke(Color3.fromRGB(255, 255, 255), 1, 0.94),
+		createCorner(12),
+		createStroke(theme.BorderSoft, 1, 0),
 	})
 end
 
 local function createSmallButton(text, backgroundColor)
 	return createInstance("TextButton", {
-		Size = UDim2.new(0.5, -5, 0, 32),
+		Size = UDim2.new(0.5, -5, 1, 0),
 		BackgroundColor3 = backgroundColor,
 		BorderSizePixel = 0,
 		Text = text,
 		TextColor3 = theme.Text,
 		TextSize = 12,
 		Font = Enum.Font.GothamMedium,
+		TextWrapped = true,
 		AutoButtonColor = true,
 	}, {
-		createCorner(10),
-		createStroke(Color3.fromRGB(255, 255, 255), 1, 0.94),
+		createCorner(11),
+		createStroke(theme.BorderSoft, 1, 0),
 	})
 end
 
@@ -319,6 +327,12 @@ local function readItemId(instance)
 	if typeof(existing) ~= "string" or existing == "" then
 		pcall(function()
 			existing = instance:GetAttribute(LEGACY_ITEM_ID_ATTRIBUTE)
+		end)
+	end
+
+	if typeof(existing) ~= "string" or existing == "" then
+		pcall(function()
+			existing = instance:GetAttribute(OLD_LEGACY_ITEM_ID_ATTRIBUTE)
 		end)
 	end
 
@@ -410,6 +424,12 @@ local function findInstanceByItemId(itemId)
 				if typeof(attribute) ~= "string" or attribute == "" then
 					pcall(function()
 						attribute = descendant:GetAttribute(LEGACY_ITEM_ID_ATTRIBUTE)
+					end)
+				end
+
+				if typeof(attribute) ~= "string" or attribute == "" then
+					pcall(function()
+						attribute = descendant:GetAttribute(OLD_LEGACY_ITEM_ID_ATTRIBUTE)
 					end)
 				end
 
@@ -755,7 +775,7 @@ local function resolveBestBaseUrl(silent)
 		apiConfig.ConnectionMode = "Cloud"
 		apiConfig.LastStatus = "Connected to cloud"
 		apiConfig.LastStatusColor = theme.Success
-		setLastAction("Using Cloud cloud server")
+		setLastAction("Using Cloud service")
 		resolvingBaseUrl = false
 		updateAllViews()
 		return true
@@ -1763,22 +1783,24 @@ local function toggleSecretVisible()
 	updateAllViews()
 end
 
-local function createCard(parent, name, height, order)
+
+local function createCard(parent, name, order)
 	local card = createInstance("Frame", {
 		Name = name,
-		Size = UDim2.new(1, 0, 0, height),
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = theme.Panel,
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 		Parent = parent,
 	}, {
-		createCorner(12),
-		createStroke(theme.Border, 1, 0.15),
-		createPadding(12, 12, 12, 12),
+		createCorner(18),
+		createStroke(theme.Border, 1, 0),
+		createPadding(14, 14, 14, 14),
 	})
 
 	createInstance("UIListLayout", {
-		Padding = UDim.new(0, 8),
+		Padding = UDim.new(0, 10),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = card,
 	})
@@ -1795,12 +1817,12 @@ local function buildWidget()
 		Size = UDim2.fromScale(1, 1),
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 6,
+		ScrollBarThickness = 5,
 		BackgroundColor3 = theme.Background,
 		BorderSizePixel = 0,
 		Parent = widget,
 	}, {
-		createPadding(16, 16, 16, 16),
+		createPadding(14, 14, 14, 14),
 	})
 
 	createInstance("UIListLayout", {
@@ -1809,111 +1831,165 @@ local function buildWidget()
 		Parent = root,
 	})
 
-	local title = createLabel("Cloud", UDim2.new(1, 0, 0, 30), theme.Text, Enum.Font.GothamBold)
-	title.TextSize = 22
-	title.LayoutOrder = 1
-	title.Parent = root
+	local function createRow(parent, height, order)
+		local row = createInstance("Frame", {
+			Size = UDim2.new(1, 0, 0, height),
+			BackgroundTransparency = 1,
+			LayoutOrder = order,
+			Parent = parent,
+		})
 
-	local subtitle = createLabel("Private development session for Cloud.", UDim2.new(1, 0, 0, 30), theme.MutedText, Enum.Font.Gotham)
-	subtitle.TextSize = 12
-	subtitle.TextYAlignment = Enum.TextYAlignment.Top
-	subtitle.LayoutOrder = 2
-	subtitle.Parent = root
+		createInstance("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Parent = row,
+		})
 
-	local sessionCard = createCard(root, "SessionCard", 396, 3)
+		return row
+	end
 
-	ui.statusLabel = createLabel("Status: Offline", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
-	ui.statusLabel.LayoutOrder = 1
-	ui.statusLabel.Parent = sessionCard
+	local function createField(parent, title, text, order, height, multiline)
+		local label = createLabel(title, UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.GothamMedium)
+		label.TextSize = 11
+		label.LayoutOrder = order
+		label.Parent = parent
 
-	ui.autoSyncStatusLabel = createLabel("Sync: Stopped", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
-	ui.autoSyncStatusLabel.LayoutOrder = 2
-	ui.autoSyncStatusLabel.Parent = sessionCard
+		local box = createInstance("TextBox", {
+			Size = UDim2.new(1, 0, 0, height or 34),
+			BackgroundColor3 = theme.PanelDark,
+			BorderSizePixel = 0,
+			Text = text,
+			TextColor3 = theme.Text,
+			TextSize = multiline and 11 or 13,
+			Font = Enum.Font.Code,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
+			ClearTextOnFocus = false,
+			TextEditable = true,
+			MultiLine = multiline == true,
+			LayoutOrder = order + 1,
+			Parent = parent,
+		}, {
+			createCorner(12),
+			createStroke(theme.BorderSoft, 1, 0),
+			createPadding(10, 10, multiline and 8 or 0, multiline and 8 or 0),
+		})
 
-	local sessionTitle = createLabel("Session ID", UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.Gotham)
-	sessionTitle.TextSize = 12
-	sessionTitle.LayoutOrder = 3
-	sessionTitle.Parent = sessionCard
+		return box
+	end
 
-	ui.sessionBox = createInstance("TextBox", {
-		Size = UDim2.new(1, 0, 0, 34),
-		BackgroundColor3 = theme.PanelDark,
-		BorderSizePixel = 0,
-		Text = "Not created",
-		TextColor3 = theme.MutedText,
-		TextSize = 14,
-		Font = Enum.Font.Code,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ClearTextOnFocus = false,
-		TextEditable = true,
-		LayoutOrder = 4,
-		Parent = sessionCard,
-	}, {
-		createCorner(10),
-		createPadding(10, 10, 0, 0),
-	})
+	local function createInfoLine(parent, leftText, rightText, order)
+		local row = createInstance("Frame", {
+			Size = UDim2.new(1, 0, 0, 22),
+			BackgroundTransparency = 1,
+			LayoutOrder = order,
+			Parent = parent,
+		})
 
-	local secretTitle = createLabel("Hidden Secret", UDim2.new(1, 0, 0, 18), theme.MutedText, Enum.Font.Gotham)
-	secretTitle.TextSize = 12
-	secretTitle.LayoutOrder = 5
-	secretTitle.Parent = sessionCard
+		local left = createLabel(leftText, UDim2.new(0.45, 0, 1, 0), theme.MutedText, Enum.Font.GothamMedium)
+		left.TextSize = 12
+		left.Parent = row
 
-	ui.secretBox = createInstance("TextBox", {
-		Size = UDim2.new(1, 0, 0, 34),
-		BackgroundColor3 = theme.PanelDark,
-		BorderSizePixel = 0,
-		Text = "Not created",
-		TextColor3 = theme.MutedText,
-		TextSize = 12,
-		Font = Enum.Font.Code,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ClearTextOnFocus = false,
-		TextEditable = true,
-		LayoutOrder = 6,
-		Parent = sessionCard,
-	}, {
-		createCorner(10),
-		createPadding(10, 10, 0, 0),
-	})
+		local right = createLabel(rightText, UDim2.new(0.55, 0, 1, 0), theme.Text, Enum.Font.Gotham)
+		right.TextSize = 12
+		right.TextXAlignment = Enum.TextXAlignment.Right
+		right.Parent = row
 
-	ui.copyBox = createInstance("TextBox", {
-		Size = UDim2.new(1, 0, 0, 64),
-		BackgroundColor3 = theme.PanelDark,
-		BorderSizePixel = 0,
-		Text = "Click Copy Session ID or Copy Secret, then press Ctrl+C.",
-		TextColor3 = theme.Text,
-		TextSize = 11,
-		Font = Enum.Font.Code,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		ClearTextOnFocus = false,
-		TextEditable = true,
-		MultiLine = true,
-		LayoutOrder = 7,
-		Parent = sessionCard,
-	}, {
-		createCorner(10),
-		createPadding(10, 10, 8, 8),
-	})
+		return row
+	end
 
-	ui.createSessionButton = createButton("Create Session", theme.AccentStrong)
-	ui.createSessionButton.LayoutOrder = 8
-	ui.createSessionButton.Parent = sessionCard
+	local headerCard = createCard(root, "HeaderCard", 1)
+	headerCard.BackgroundColor3 = theme.Surface
 
-	local copyButtons = createInstance("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
+	local headerRow = createInstance("Frame", {
+		Name = "HeaderRow",
+		Size = UDim2.new(1, 0, 0, 58),
 		BackgroundTransparency = 1,
-		LayoutOrder = 9,
-		Parent = sessionCard,
+		LayoutOrder = 1,
+		Parent = headerCard,
 	})
 
 	createInstance("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 10),
+		Padding = UDim.new(0, 12),
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = copyButtons,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Parent = headerRow,
 	})
 
+	local iconWrap = createInstance("Frame", {
+		Size = UDim2.new(0, 50, 0, 50),
+		BackgroundColor3 = theme.PanelDark,
+		BorderSizePixel = 0,
+		LayoutOrder = 1,
+		Parent = headerRow,
+	}, {
+		createCorner(16),
+		createStroke(theme.Border, 1, 0),
+	})
+
+	createInstance("ImageLabel", {
+		Size = UDim2.new(1, -10, 1, -10),
+		Position = UDim2.new(0, 5, 0, 5),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://136661669872868",
+		ScaleType = Enum.ScaleType.Fit,
+		Parent = iconWrap,
+	})
+
+	local headerText = createInstance("Frame", {
+		Size = UDim2.new(1, -62, 1, 0),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Parent = headerRow,
+	})
+
+	createInstance("UIListLayout", {
+		Padding = UDim.new(0, 2),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Parent = headerText,
+	})
+
+	local title = createLabel("Cloud", UDim2.new(1, 0, 0, 26), theme.Text, Enum.Font.GothamBold)
+	title.TextSize = 22
+	title.LayoutOrder = 1
+	title.Parent = headerText
+
+	local subtitle = createLabel("Integrated development environment for Roblox.", UDim2.new(1, 0, 0, 28), theme.MutedText, Enum.Font.Gotham)
+	subtitle.TextSize = 12
+	subtitle.TextYAlignment = Enum.TextYAlignment.Top
+	subtitle.LayoutOrder = 2
+	subtitle.Parent = headerText
+
+	local sessionCard = createCard(root, "SessionCard", 2)
+
+	local sessionHeader = createLabel("Session", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
+	sessionHeader.TextSize = 16
+	sessionHeader.LayoutOrder = 1
+	sessionHeader.Parent = sessionCard
+
+	ui.statusLabel = createLabel("Status: Offline", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
+	ui.statusLabel.TextSize = 12
+	ui.statusLabel.LayoutOrder = 2
+	ui.statusLabel.Parent = sessionCard
+
+	ui.autoSyncStatusLabel = createLabel("Sync: Stopped", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
+	ui.autoSyncStatusLabel.TextSize = 12
+	ui.autoSyncStatusLabel.LayoutOrder = 3
+	ui.autoSyncStatusLabel.Parent = sessionCard
+
+	ui.sessionBox = createField(sessionCard, "Session ID", "Not created", 4, 34, false)
+	ui.secretBox = createField(sessionCard, "Hidden Secret", "Not created", 6, 34, false)
+	ui.copyBox = createField(sessionCard, "Copy Buffer", "Click Copy Session ID or Copy Secret, then press Ctrl+C.", 8, 62, true)
+
+	ui.createSessionButton = createButton("Create Session", theme.AccentStrong)
+	ui.createSessionButton.LayoutOrder = 10
+	ui.createSessionButton.Parent = sessionCard
+
+	local copyButtons = createRow(sessionCard, 34, 11)
 	ui.copyIdButton = createSmallButton("Copy Session ID", theme.PanelSoft)
 	ui.copyIdButton.LayoutOrder = 1
 	ui.copyIdButton.Parent = copyButtons
@@ -1922,20 +1998,7 @@ local function buildWidget()
 	ui.copySecretButton.LayoutOrder = 2
 	ui.copySecretButton.Parent = copyButtons
 
-	local secondButtons = createInstance("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundTransparency = 1,
-		LayoutOrder = 10,
-		Parent = sessionCard,
-	})
-
-	createInstance("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 10),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = secondButtons,
-	})
-
+	local secondButtons = createRow(sessionCard, 34, 12)
 	ui.revealSecretButton = createSmallButton("Reveal Secret", theme.PanelSoft)
 	ui.revealSecretButton.LayoutOrder = 1
 	ui.revealSecretButton.Parent = secondButtons
@@ -1944,20 +2007,7 @@ local function buildWidget()
 	ui.copyLoginButton.LayoutOrder = 2
 	ui.copyLoginButton.Parent = secondButtons
 
-	local endButtons = createInstance("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundTransparency = 1,
-		LayoutOrder = 11,
-		Parent = sessionCard,
-	})
-
-	createInstance("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 10),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = endButtons,
-	})
-
+	local endButtons = createRow(sessionCard, 34, 13)
 	ui.endSessionButton = createSmallButton("End Session", theme.Danger)
 	ui.endSessionButton.LayoutOrder = 1
 	ui.endSessionButton.Parent = endButtons
@@ -1968,15 +2018,15 @@ local function buildWidget()
 	playModeNote.AutoButtonColor = false
 	playModeNote.Parent = endButtons
 
-	local apiCard = createCard(root, "ApiCard", 238, 4)
+	local apiCard = createCard(root, "ConnectionCard", 3)
 
 	local apiTitle = createLabel("Connection", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
-	apiTitle.TextSize = 15
+	apiTitle.TextSize = 16
 	apiTitle.LayoutOrder = 1
 	apiTitle.Parent = apiCard
 
-	ui.apiStatusLabel = createLabel("API: Not connected", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.Gotham)
-	ui.apiStatusLabel.TextSize = 13
+	ui.apiStatusLabel = createLabel("API: Not connected", UDim2.new(1, 0, 0, 22), theme.MutedText, Enum.Font.GothamMedium)
+	ui.apiStatusLabel.TextSize = 12
 	ui.apiStatusLabel.LayoutOrder = 2
 	ui.apiStatusLabel.Parent = apiCard
 
@@ -1985,60 +2035,35 @@ local function buildWidget()
 	ui.connectionModeLabel.LayoutOrder = 3
 	ui.connectionModeLabel.Parent = apiCard
 
-	ui.apiBaseUrlBox = createInstance("TextBox", {
-		Size = UDim2.new(1, 0, 0, 34),
-		BackgroundColor3 = theme.PanelDark,
-		BorderSizePixel = 0,
-		Text = apiConfig.BaseUrl,
-		TextColor3 = theme.Text,
-		TextSize = 13,
-		Font = Enum.Font.Code,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ClearTextOnFocus = false,
-		TextEditable = true,
-		LayoutOrder = 4,
-		Parent = apiCard,
-	}, {
-		createCorner(10),
-		createPadding(10, 10, 0, 0),
-	})
+	ui.apiBaseUrlBox = createField(apiCard, "Endpoint", apiConfig.BaseUrl, 4, 34, false)
 
-	local apiButtons = createInstance("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundTransparency = 1,
-		LayoutOrder = 5,
-		Parent = apiCard,
-	})
-
-	createInstance("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 10),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = apiButtons,
-	})
-
+	local apiButtons = createRow(apiCard, 34, 6)
 	ui.testApiButton = createSmallButton("Detect API", theme.PanelSoft)
 	ui.testApiButton.LayoutOrder = 1
 	ui.testApiButton.Parent = apiButtons
 
 	ui.manualRefreshButton = createSmallButton("Sync Now", theme.Warning)
-	ui.manualRefreshButton.TextColor3 = Color3.fromRGB(30, 30, 30)
+	ui.manualRefreshButton.TextColor3 = Color3.fromRGB(20, 20, 24)
 	ui.manualRefreshButton.LayoutOrder = 2
 	ui.manualRefreshButton.Parent = apiButtons
 
-	local hint = createLabel("Cloud uses localhost:3000 when the app is open. If not, it falls back to Render cloud.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
+	local hint = createLabel("Cloud prefers the local desktop app. If it is closed, cloud mode is used automatically.", UDim2.new(1, 0, 0, 44), theme.MutedText, Enum.Font.Gotham)
 	hint.TextSize = 12
-	hint.LayoutOrder = 6
+	hint.TextYAlignment = Enum.TextYAlignment.Top
+	hint.LayoutOrder = 7
 	hint.Parent = apiCard
 
-	local statsCard = createCard(root, "StatsCard", 164, 5)
+	local statsCard = createCard(root, "StatusCard", 4)
 
 	local statsTitle = createLabel("Live Status", UDim2.new(1, 0, 0, 24), theme.Text, Enum.Font.GothamBold)
-	statsTitle.TextSize = 15
+	statsTitle.TextSize = 16
 	statsTitle.LayoutOrder = 1
 	statsTitle.Parent = statsCard
 
-	ui.statsLabel = createLabel("Items: 0\nRevision: 0\nLast Upload: Never\nUpload every: 5s", UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
+	ui.statsLabel = createLabel("Items: 0
+Revision: 0
+Last Upload: Never
+Upload every: 5s", UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
 	ui.statsLabel.TextSize = 12
 	ui.statsLabel.TextYAlignment = Enum.TextYAlignment.Top
 	ui.statsLabel.LayoutOrder = 2

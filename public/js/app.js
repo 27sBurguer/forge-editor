@@ -44,6 +44,8 @@ const refs = {
 	loadButton: document.getElementById("loadButton"),
 	connectionButton: document.getElementById("connectionButton"),
 	connectionModal: document.getElementById("connectionModal"),
+	connectionDialog: document.getElementById("connectionDialog"),
+	connectedSessionLabel: document.getElementById("connectedSessionLabel"),
 	closeConnectionButton: document.getElementById("closeConnectionButton"),
 	cancelConnectionButton: document.getElementById("cancelConnectionButton"),
 	disconnectButton: document.getElementById("disconnectButton"),
@@ -1379,11 +1381,29 @@ function startPolling() {
 	state.pollTimer = setInterval(() => loadSessionFiles(false), FILES_POLL_INTERVAL);
 }
 
+function getMaskedSessionId() {
+	const value = String(state.sessionId || "").trim();
+	if (!value) return "Session active";
+	return value.length > 6 ? value.slice(0, 3) + "••••" + value.slice(-3) : "Session active";
+}
+
+function syncConnectionModalMode() {
+	const connected = hasConnection();
+	if (refs.connectionDialog) refs.connectionDialog.classList.toggle("connected", connected);
+	if (refs.connectedSessionLabel) refs.connectedSessionLabel.textContent = connected ? getMaskedSessionId() : "Session active";
+	if (refs.cancelConnectionButton) refs.cancelConnectionButton.textContent = connected ? tx("done") : tx("cancel");
+	if (refs.connectionButton) refs.connectionButton.title = connected ? "Session options" : "Connect";
+}
+
 function openConnectionModal() {
+	syncConnectionModalMode();
 	refs.sessionInput.value = "";
 	refs.secretInput.value = "";
 	refs.connectionModal.classList.add("open");
-	setTimeout(() => refs.sessionInput.focus(), 30);
+	setTimeout(() => {
+		if (hasConnection()) refs.disconnectButton.focus();
+		else refs.sessionInput.focus();
+	}, 30);
 }
 
 function closeConnectionModal() {
@@ -1419,8 +1439,9 @@ async function connectSession(idOverride = null, secretOverride = null) {
 	if (ok) {
 		await restoreWorkspaceState();
 		startPolling();
+		syncConnectionModalMode();
 		closeConnectionModal();
-		showToast("Private session connected.", "success");
+		showToast("Workspace connected.", "success");
 	}
 	document.body.classList.remove("session-loading");
 	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Enter workspace";
@@ -1442,6 +1463,8 @@ function disconnectSession() {
 	sessionStorage.removeItem(SESSION_STORAGE.sessionId);
 	sessionStorage.removeItem(SESSION_STORAGE.secret);
 	try { localStorage.removeItem(workspaceKey); } catch (error) {}
+	if (refs.gateSessionInput) refs.gateSessionInput.value = "";
+	if (refs.gateSecretInput) refs.gateSecretInput.value = "";
 
 	if (state.pollTimer) clearInterval(state.pollTimer);
 	state.editor.setValue("", "primary");
@@ -1450,7 +1473,8 @@ function disconnectSession() {
 	renderTree();
 	renderTabs();
 	updateEditorHeader();
-	openConnectionModal();
+	syncConnectionModalMode();
+	closeConnectionModal();
 }
 
 function getBestCreationParent() {
@@ -2171,6 +2195,7 @@ function boot() {
 	renderTree();
 	updateEditorHeader();
 	updateConnectionUi(hasConnection(), hasConnection() ? "Connected" : "Disconnected");
+	syncConnectionModalMode();
 
 	if (hasConnection()) {
 		setTimeout(async () => {
