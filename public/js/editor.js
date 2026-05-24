@@ -290,6 +290,65 @@ export function createEditorController(options) {
 			const target = groups[group] || groups.primary;
 			return this.ready && target.editor ? target.editor.getValue() : target.fallback.value;
 		},
+		getViewState(group = this.activeGroup) {
+			const target = groups[group] || groups.primary;
+
+			if (this.ready && target.editor) {
+				return {
+					type: "monaco",
+					state: target.editor.saveViewState(),
+					position: target.editor.getPosition(),
+					scrollTop: target.editor.getScrollTop(),
+					scrollLeft: target.editor.getScrollLeft(),
+				};
+			}
+
+			return {
+				type: "fallback",
+				selectionStart: target.fallback.selectionStart || 0,
+				selectionEnd: target.fallback.selectionEnd || 0,
+				scrollTop: target.fallback.scrollTop || 0,
+				scrollLeft: target.fallback.scrollLeft || 0,
+			};
+		},
+		restoreViewState(viewState, group = this.activeGroup) {
+			const target = groups[group] || groups.primary;
+
+			if (!viewState) {
+				this.resetViewState(group);
+				return;
+			}
+
+			if (this.ready && target.editor && viewState.type === "monaco") {
+				if (viewState.state) target.editor.restoreViewState(viewState.state);
+				if (viewState.position) target.editor.setPosition(viewState.position);
+				if (typeof viewState.scrollTop === "number") target.editor.setScrollTop(viewState.scrollTop);
+				if (typeof viewState.scrollLeft === "number") target.editor.setScrollLeft(viewState.scrollLeft);
+				return;
+			}
+
+			const textLength = target.fallback.value.length;
+			target.fallback.selectionStart = Math.min(textLength, Math.max(0, viewState.selectionStart || 0));
+			target.fallback.selectionEnd = Math.min(textLength, Math.max(0, viewState.selectionEnd || 0));
+			target.fallback.scrollTop = viewState.scrollTop || 0;
+			target.fallback.scrollLeft = viewState.scrollLeft || 0;
+		},
+		resetViewState(group = this.activeGroup) {
+			const target = groups[group] || groups.primary;
+
+			if (this.ready && target.editor) {
+				target.editor.setPosition({ lineNumber: 1, column: 1 });
+				target.editor.setScrollTop(0);
+				target.editor.setScrollLeft(0);
+				target.editor.revealPositionNearTop({ lineNumber: 1, column: 1 });
+				return;
+			}
+
+			target.fallback.selectionStart = 0;
+			target.fallback.selectionEnd = 0;
+			target.fallback.scrollTop = 0;
+			target.fallback.scrollLeft = 0;
+		},
 		setValue(value, group = this.activeGroup) {
 			const target = groups[group] || groups.primary;
 			target.applyingValue = true;

@@ -160,14 +160,25 @@ function getWorkspaceStorageKey() {
 	return sessionId ? STORAGE.workspace + ":" + sessionId : STORAGE.workspace;
 }
 
-function saveWorkspaceState() {
+function saveWorkspaceState(saveViews = true) {
 	if (!hasConnection() || state.isRestoringWorkspace) return;
+
+	if (saveViews) saveAllVisibleEditorViewStates();
+
+	const viewStates = {};
+
+	for (const tab of state.openTabs.values()) {
+		if (tab.viewState) {
+			viewStates[tab.fileId] = tab.viewState;
+		}
+	}
 
 	const payload = {
 		tabIds: Array.from(state.openTabs.keys()),
 		currentFileId: state.currentFileId || "",
 		secondaryFileId: state.secondaryFileId || "",
 		activeGroup: state.activeGroup || "primary",
+		viewStates,
 		savedAt: Date.now(),
 	};
 
@@ -395,6 +406,33 @@ function setSelectedNode(node) {
 
 function getActiveFileId(group = state.activeGroup) {
 	return group === "secondary" ? state.secondaryFileId : state.currentFileId;
+}
+
+function saveEditorViewForGroup(group = state.activeGroup) {
+	if (!state.editor) return;
+
+	const fileId = getActiveFileId(group);
+	const tab = fileId ? state.openTabs.get(fileId) : null;
+
+	if (!tab) return;
+
+	tab.viewState = state.editor.getViewState(group);
+}
+
+function saveAllVisibleEditorViewStates() {
+	saveEditorViewForGroup("primary");
+
+	if (state.secondaryFileId) {
+		saveEditorViewForGroup("secondary");
+	}
+}
+
+function restoreEditorViewForTab(tab, group = state.activeGroup) {
+	if (!state.editor) return;
+
+	setTimeout(() => {
+		state.editor.restoreViewState(tab && tab.viewState ? tab.viewState : null, group);
+	}, 0);
 }
 
 function setActiveGroup(group) {
@@ -902,14 +940,17 @@ function switchTab(fileId, group = "primary") {
 	const tab = state.openTabs.get(fileId);
 	if (!tab) return;
 
-	if (group === "secondary") {
+	const targetGroup = group === "secondary" ? "secondary" : "primary";
+	saveEditorViewForGroup(targetGroup);
+
+	if (targetGroup === "secondary") {
 		state.secondaryFileId = fileId;
 		state.editor.setSplit(true);
 	} else {
 		state.currentFileId = fileId;
 	}
 
-	state.activeGroup = group === "secondary" ? "secondary" : "primary";
+	state.activeGroup = targetGroup;
 	state.selectedKey = "item:" + fileId;
 	state.selectedPayload = {
 		root: tab.root,
@@ -919,11 +960,13 @@ function switchTab(fileId, group = "primary") {
 	};
 
 	state.editor.setValue(tab.source, state.activeGroup);
+	restoreEditorViewForTab(tab, state.activeGroup);
 	renderTabs();
 	renderTree();
 	updateEditorHeader();
-	state.editor.focus(state.activeGroup);
-	saveWorkspaceState();
+	setTimeout(() => state.editor.focus(state.activeGroup), 0);
+	saveWorkspaceState(false);
+	setTimeout(() => saveWorkspaceState(true), 25);
 }
 
 function splitTab(fileId = state.currentFileId) {
@@ -976,6 +1019,7 @@ async function openFile(file) {
 			baseSourceHash: data.sourceHash || file.sourceHash || null,
 			sourceHash: data.sourceHash || file.sourceHash || null,
 			dirty: false,
+			viewState: null,
 		});
 
 		switchTab(file.fileId, "primary");
@@ -1035,6 +1079,7 @@ function markCurrentDirty(group = state.activeGroup) {
 	if (!tab) return;
 
 	tab.source = state.editor.getValue(group);
+	tab.viewState = state.editor.getViewState(group);
 	tab.dirty = true;
 	state.projectSearchCache.set(fileId, tab.source);
 	renderTabs();
@@ -1095,10 +1140,12 @@ async function reloadTabSource(fileId, silent = true) {
 
 		if (state.currentFileId === fileId) {
 			state.editor.setValue(tab.source, "primary");
+			restoreEditorViewForTab(tab, "primary");
 		}
 
 		if (state.secondaryFileId === fileId) {
 			state.editor.setValue(tab.source, "secondary");
+			restoreEditorViewForTab(tab, "secondary");
 		}
 
 		state.projectSearchCache.set(fileId, tab.source);
@@ -1216,6 +1263,7 @@ async function restoreWorkspaceState() {
 				baseSourceHash: data.sourceHash || file.sourceHash || null,
 				sourceHash: data.sourceHash || file.sourceHash || null,
 				dirty: false,
+				viewState: saved.viewStates && saved.viewStates[file.fileId] ? saved.viewStates[file.fileId] : null,
 			});
 			state.projectSearchCache.set(file.fileId, data.source || "");
 			restoredIds.push(file.fileId);
@@ -1241,6 +1289,7 @@ async function restoreWorkspaceState() {
 	const primaryTab = state.openTabs.get(primaryId);
 	if (primaryTab) {
 		state.editor.setValue(primaryTab.source || "", "primary");
+		restoreEditorViewForTab(primaryTab, "primary");
 		state.selectedKey = "item:" + primaryTab.fileId;
 		state.selectedPayload = {
 			root: primaryTab.root,
@@ -1253,7 +1302,10 @@ async function restoreWorkspaceState() {
 	if (secondaryId) {
 		const secondaryTab = state.openTabs.get(secondaryId);
 		state.editor.setSplit(true);
-		if (secondaryTab) state.editor.setValue(secondaryTab.source || "", "secondary");
+		if (secondaryTab) {
+			state.editor.setValue(secondaryTab.source || "", "secondary");
+			restoreEditorViewForTab(secondaryTab, "secondary");
+		}
 	} else {
 		state.editor.setSplit(false);
 	}
@@ -1262,7 +1314,8 @@ async function restoreWorkspaceState() {
 	renderTree();
 	updateEditorHeader();
 	state.editor.focus(state.activeGroup);
-	saveWorkspaceState();
+	saveWorkspaceState(false);
+	setTimeout(() => saveWorkspaceState(true), 25);
 	setStatus("Restored " + restoredIds.length + " open script(s).", "success");
 	return true;
 }
@@ -1968,6 +2021,7 @@ function bootEditor() {
 		onFallbackKeyDown: handleEditorKeys,
 		onCursor(position, group) {
 			state.activeGroup = group || state.activeGroup;
+			saveEditorViewForGroup(group);
 			refs.footerRight.textContent = "Ln " + position.lineNumber + ", Col " + position.column + " · Ctrl+1-9 tabs · Ctrl+W close tab · Ctrl+Shift+E fold · Ctrl+E unfold";
 			updateEditorHeader();
 		},
