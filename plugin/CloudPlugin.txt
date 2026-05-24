@@ -2060,10 +2060,12 @@ local function buildWidget()
 	statsTitle.LayoutOrder = 1
 	statsTitle.Parent = statsCard
 
-	ui.statsLabel = createLabel("Items: 0
-Revision: 0
-Last Upload: Never
-Upload every: 5s", UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
+	ui.statsLabel = createLabel(table.concat({
+		"Items: 0",
+		"Revision: 0",
+		"Last Upload: Never",
+		"Upload every: 5s",
+	}, "\n"), UDim2.new(1, 0, 0, 78), theme.MutedText, Enum.Font.Code)
 	ui.statsLabel.TextSize = 12
 	ui.statsLabel.TextYAlignment = Enum.TextYAlignment.Top
 	ui.statsLabel.LayoutOrder = 2

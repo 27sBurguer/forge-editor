@@ -10,6 +10,11 @@
 </head>
 <body class="no-session">
 	<div id="sessionGate" class="session-gate">
+		<div class="session-sky" aria-hidden="true">
+			<span class="cloud-float cloud-float-a"></span>
+			<span class="cloud-float cloud-float-b"></span>
+			<span class="cloud-float cloud-float-c"></span>
+		</div>
 		<div class="session-gate-shell">
 			<div class="session-gate-top">
 				<div class="session-gate-brand">
@@ -19,37 +24,52 @@
 						<span>A complete integrated development environment for Roblox.</span>
 					</div>
 				</div>
-				<select id="gateAppearanceSelect" class="appearance-select" aria-label="Appearance">
-					<option value="system">System</option>
-					<option value="dark">Dark</option>
-					<option value="light">Light</option>
-				</select>
+				<div class="session-top-actions">
+					<select id="gateAppearanceSelect" class="appearance-select" aria-label="Appearance">
+						<option value="system">System</option>
+						<option value="dark">Dark</option>
+						<option value="light">Light</option>
+					</select>
+					<a class="top-plugin-link" href="https://create.roblox.com/store/asset/110405258188669/Forge-Codex" target="_blank" rel="noopener">Plugin</a>
+				</div>
 			</div>
-			<div class="session-gate-content">
-				<section class="session-hero-card">
-					<div class="session-pill">Private workspace</div>
-					<h1>Build inside Cloud</h1>
-					<p>Enter your session once and keep working from the same clean workspace.</p>
-					<div class="session-feature-grid">
-						<div><strong>Live sync</strong><span>Keep edits moving between Cloud and your project.</span></div>
-						<div><strong>Clean workspace</strong><span>Tabs, split view and saved editor positions.</span></div>
-						<div><strong>Session locked</strong><span>Access requires your session ID and secret.</span></div>
+			<div class="session-gate-content cloud-entry-layout">
+				<section class="session-hero-card cloud-hero-card">
+					<div class="cloud-status-row">
+						<span class="session-pill">Private Cloud</span>
+						<span class="cloud-live-pill"><i></i> Ready</span>
+					</div>
+					<h1>Keep your scripts close to the sky.</h1>
+					<p>Open a private session and work from a calm, synced workspace built for Roblox development.</p>
+					<div class="cloud-window-preview" aria-hidden="true">
+						<div class="cloud-window-top"><span></span><span></span><span></span></div>
+						<div class="cloud-window-body">
+							<div class="cloud-window-tree"><b></b><b></b><b></b><b></b></div>
+							<div class="cloud-window-code"><i></i><i></i><i></i><i></i><i></i></div>
+						</div>
+					</div>
+					<div class="session-feature-grid cloud-feature-grid">
+						<div><strong>Live workspace</strong><span>Edit, save and keep your project in sync.</span></div>
+						<div><strong>Focused tabs</strong><span>Your scripts stay organized without visual noise.</span></div>
+						<div><strong>Private access</strong><span>Your session only opens with the correct secret.</span></div>
 					</div>
 				</section>
-				<section class="session-login-card">
+				<section class="session-login-card cloud-login-card">
 					<div class="session-login-head">
-						<strong>Connect</strong>
-						<span>Paste the session created by the Cloud plugin.</span>
+						<span class="login-eyebrow">Workspace access</span>
+						<strong>Enter your session</strong>
+						<span>Paste the ID and secret from the Cloud plugin.</span>
 					</div>
 					<label for="gateSessionInput">Session ID</label>
 					<input id="gateSessionInput" type="password" placeholder="Paste session ID" autocomplete="off" />
 					<label for="gateSecretInput">Session Secret</label>
 					<input id="gateSecretInput" type="password" placeholder="Paste session secret" autocomplete="off" />
-					<button id="gateConnectButton" class="gate-connect-button">Enter workspace</button>
+					<button id="gateConnectButton" class="gate-connect-button">Enter Cloud</button>
 					<div class="session-gate-actions">
 						<a class="download-app-button" href="https://github.com/27sBurguer/forge-editor/releases/latest/download/Cloud-Setup.exe" target="_blank" rel="noopener">Download app</a>
 						<a href="https://create.roblox.com/store/asset/110405258188669/Forge-Codex" target="_blank" rel="noopener">Plugin</a>
 					</div>
+					<div class="cloud-login-note">Local app is used first. Cloud service is used when the app is closed.</div>
 				</section>
 			</div>
 		</div>
@@ -259,65 +279,109 @@
 	</div>
 
 	<div id="settingsModal" class="modal-backdrop">
-		<div class="modal">
-			<div class="modal-head">
-				<div class="modal-title">Editor Settings</div>
+		<div class="modal settings-modal">
+			<div class="modal-head settings-head">
+				<div>
+					<div class="modal-title">Settings</div>
+					<div class="modal-subtitle">Shape Cloud around the way you like to code.</div>
+				</div>
 				<button id="closeSettingsButton" class="icon-button" aria-label="Close settings modal">
 					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
 				</button>
 			</div>
-			<div class="modal-body settings-body">
-				<div class="setting-grid">
-					<label for="languageInput">Interface language</label>
-					<select id="languageInput"></select>
-					<label for="appearanceInput">Appearance</label>
-					<select id="appearanceInput">
-						<option value="system">System default</option>
-						<option value="dark">Dark</option>
-						<option value="light">Light</option>
-					</select>
-					<label for="fontFamilyInput">Font family</label>
-					<input id="fontFamilyInput" placeholder="JetBrains Mono, Cascadia Code, Fira Code, Consolas, monospace" />
-					<label for="fontSizeInput">Font size</label>
-					<input id="fontSizeInput" type="number" min="10" max="28" />
-					<label for="autosaveInput">Autosave ms</label>
-					<input id="autosaveInput" type="number" min="1000" max="15000" />
-					<label for="wordWrapInput">Word wrap</label>
-					<select id="wordWrapInput">
-						<option value="off">Off</option>
-						<option value="on">On</option>
-					</select>
-					<label for="editorThemeInput">Editor theme</label>
-					<select id="editorThemeInput">
-						<option value="cloud-dark">Cloud Dark</option>
-						<option value="cloud-codex">Codex Graphite</option>
-						<option value="cloud-graphite">Graphite</option>
-						<option value="cloud-void">Void</option>
-						<option value="cloud-midnight">Midnight</option>
-						<option value="cloud-warm">Warm Dark</option>
-						<option value="cloud-forest">Forest</option>
-						<option value="cloud-rose-pine">Rose Pine</option>
-						<option value="cloud-nord">Nord</option>
-						<option value="cloud-dracula">Dracula</option>
-						<option value="cloud-ocean">Ocean</option>
-						<option value="cloud-mono">Mono</option>
-						<option value="cloud-contrast">High Contrast</option>
-					</select>
-					<label for="minimapInput">Minimap</label>
-					<input id="minimapInput" type="checkbox" />
+			<div class="modal-body settings-body settings-cloud-body">
+				<div class="settings-panel">
+					<section class="setting-section">
+						<div class="setting-section-head">
+							<strong>Workspace</strong>
+							<span>Interface and editor behavior</span>
+						</div>
+						<div class="setting-grid cloud-setting-grid">
+							<label for="languageInput">Interface language</label>
+							<select id="languageInput"></select>
+							<label for="appearanceInput">Appearance</label>
+							<select id="appearanceInput">
+								<option value="system">System default</option>
+								<option value="dark">Dark</option>
+								<option value="light">Light</option>
+							</select>
+							<label for="wordWrapInput">Word wrap</label>
+							<select id="wordWrapInput">
+								<option value="off">Off</option>
+								<option value="on">On</option>
+							</select>
+							<label for="minimapInput">Minimap</label>
+							<label class="cloud-switch" for="minimapInput">
+								<input id="minimapInput" type="checkbox" />
+								<span></span>
+								<em>Show code map</em>
+							</label>
+						</div>
+					</section>
+					<section class="setting-section">
+						<div class="setting-section-head">
+							<strong>Typography</strong>
+							<span>Readable defaults for long Lua sessions</span>
+						</div>
+						<div class="setting-grid cloud-setting-grid">
+							<label for="fontFamilyInput">Font family</label>
+							<input id="fontFamilyInput" placeholder="JetBrains Mono, Cascadia Code, Fira Code, Consolas, monospace" />
+							<label for="fontSizeInput">Font size</label>
+							<input id="fontSizeInput" type="number" min="10" max="28" />
+							<label for="autosaveInput">Autosave delay</label>
+							<input id="autosaveInput" type="number" min="1000" max="15000" />
+						</div>
+					</section>
+					<section class="setting-section">
+						<div class="setting-section-head">
+							<strong>Theme presets</strong>
+							<span>Pick a mood, then fine tune it</span>
+						</div>
+						<div class="theme-preset-grid">
+							<button type="button" class="theme-preset" data-theme-preset="cloud-dark"><span style="--a:#111827;--b:#6d5dfc;--c:#60a5fa"></span><strong>Cloud Dark</strong><em>Balanced</em></button>
+							<button type="button" class="theme-preset" data-theme-preset="cloud-codex"><span style="--a:#0f1115;--b:#7c86a8;--c:#d1d5db"></span><strong>Graphite</strong><em>Clean</em></button>
+							<button type="button" class="theme-preset" data-theme-preset="cloud-midnight"><span style="--a:#08111f;--b:#3b82f6;--c:#93c5fd"></span><strong>Midnight</strong><em>Deep</em></button>
+							<button type="button" class="theme-preset" data-theme-preset="cloud-ocean"><span style="--a:#07131e;--b:#0ea5e9;--c:#67e8f9"></span><strong>Ocean</strong><em>Soft</em></button>
+						</div>
+						<label class="hidden-setting-label" for="editorThemeInput">Editor theme</label>
+						<select id="editorThemeInput" class="theme-select">
+							<option value="cloud-dark">Cloud Dark</option>
+							<option value="cloud-codex">Codex Graphite</option>
+							<option value="cloud-graphite">Graphite</option>
+							<option value="cloud-void">Void</option>
+							<option value="cloud-midnight">Midnight</option>
+							<option value="cloud-warm">Warm Dark</option>
+							<option value="cloud-forest">Forest</option>
+							<option value="cloud-rose-pine">Rose Pine</option>
+							<option value="cloud-nord">Nord</option>
+							<option value="cloud-dracula">Dracula</option>
+							<option value="cloud-ocean">Ocean</option>
+							<option value="cloud-mono">Mono</option>
+							<option value="cloud-contrast">High Contrast</option>
+						</select>
+					</section>
 				</div>
-				<div class="editor-preview-card">
+				<div class="editor-preview-card cloud-preview-card">
 					<div class="preview-head">
-						<span>Theme Preview</span>
-						<span id="settingsPreviewMeta">Lua · 14px · 3000ms</span>
+						<div><span>Preview</span><strong id="settingsPreviewMeta">Lua · 14px · 3000ms</strong></div>
+						<div class="preview-dots"><i></i><i></i><i></i></div>
 					</div>
-					<pre id="settingsPreview" class="editor-preview"><code><span class="kw">local</span> Players = game:<span class="fn">GetService</span>(<span class="str">"Players"</span>)
-
-Players.PlayerAdded:<span class="fn">Connect</span>(<span class="kw">function</span>(player)
-	<span class="fn">print</span>(player.Name)
-<span class="kw">end</span>)</code></pre>
+					<div class="preview-editor-shell">
+						<pre id="settingsPreview" class="editor-preview"><code><span class="ln">1</span><span class="kw">local</span> Players = game:<span class="fn">GetService</span>(<span class="str">"Players"</span>)
+<span class="ln">2</span><span class="kw">local</span> ReplicatedStorage = game:<span class="fn">GetService</span>(<span class="str">"ReplicatedStorage"</span>)
+<span class="ln">3</span>
+<span class="ln">4</span>Players.PlayerAdded:<span class="fn">Connect</span>(<span class="kw">function</span>(player)
+<span class="ln">5</span>	<span class="kw">local</span> profile = ReplicatedStorage:<span class="fn">WaitForChild</span>(<span class="str">"Profiles"</span>)
+<span class="ln">6</span>	<span class="fn">print</span>(player.Name, profile.Name)
+<span class="ln">7</span><span class="kw">end</span>)</code></pre>
+						<div id="previewMinimap" class="preview-minimap"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+					</div>
+					<div class="settings-summary">
+						<span id="previewWrapBadge">Wrap off</span>
+						<span id="previewMinimapBadge">Minimap on</span>
+					</div>
 				</div>
-				<div class="modal-actions">
+				<div class="modal-actions settings-actions">
 					<button id="resetSettingsButton" class="secondary-button">Reset</button>
 					<button id="saveSettingsButton" class="primary-button">Apply</button>
 				</div>
@@ -325,6 +389,7 @@ Players.PlayerAdded:<span class="fn">Connect</span>(<span class="kw">function</s
 		</div>
 	</div>
 
+	
 	<div id="betaWarningModal" class="modal-backdrop beta-backdrop">
 		<div class="modal beta-modal">
 			<div class="beta-mark">!</div>

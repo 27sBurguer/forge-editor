@@ -435,8 +435,9 @@ export function createEditorController(options) {
 						fontFamily: settings.fontFamily,
 						fontSize: settings.fontSize,
 						wordWrap: settings.wordWrap,
-						minimap: { enabled: settings.minimap },
+						minimap: { enabled: !!settings.minimap },
 					});
+					setTimeout(() => target.editor.layout(), 20);
 				}
 			}
 			if (this.ready && window.monaco) monaco.editor.setTheme(settings.editorTheme || "cloud-dark");
@@ -472,7 +473,7 @@ export function createEditorController(options) {
 					fontFamily: options.settings.fontFamily,
 					fontSize: options.settings.fontSize,
 					wordWrap: options.settings.wordWrap,
-					minimap: { enabled: options.settings.minimap },
+					minimap: { enabled: !!options.settings.minimap },
 					tabSize: 4,
 					insertSpaces: false,
 					formatOnPaste: true,
@@ -497,6 +498,7 @@ export function createEditorController(options) {
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyE, () => options.onFoldAll?.(groupName));
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE, () => options.onUnfoldAll?.(groupName));
 				target.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => options.onCreate(groupName));
+				target.editor.addCommand(monaco.KeyCode.F2, () => options.onRename?.(groupName));
 				target.fallback.style.display = "none";
 			}
 

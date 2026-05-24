@@ -111,6 +111,9 @@ const refs = {
 	saveSettingsButton: document.getElementById("saveSettingsButton"),
 	settingsPreview: document.getElementById("settingsPreview"),
 	settingsPreviewMeta: document.getElementById("settingsPreviewMeta"),
+	previewMinimap: document.getElementById("previewMinimap"),
+	previewMinimapBadge: document.getElementById("previewMinimapBadge"),
+	previewWrapBadge: document.getElementById("previewWrapBadge"),
 	betaWarningModal: document.getElementById("betaWarningModal"),
 	betaLanguageSelect: document.getElementById("betaLanguageSelect"),
 	betaContinueButton: document.getElementById("betaContinueButton"),
@@ -735,21 +738,25 @@ function renderNode(parent, node, depth, query) {
 			setTimeout(() => {
 				if (renameFinished || state.renamingItemId !== node.item.fileId) return;
 
-				if (Date.now() - state.renameStartedAt < 220) {
-					nameEl.focus();
-					nameEl.select();
+				if (Date.now() - state.renameStartedAt < 520) {
+					setTimeout(() => {
+						if (!renameFinished && state.renamingItemId === node.item.fileId) {
+							nameEl.focus();
+							nameEl.select();
+						}
+					}, 30);
 					return;
 				}
 
 				finishRename(true);
-			}, 120);
+			}, 160);
 		});
 
 		setTimeout(() => {
 			if (state.renamingItemId !== node.item.fileId) return;
 			nameEl.focus();
 			nameEl.select();
-		}, 40);
+		}, 80);
 	} else {
 		nameEl = document.createElement("span");
 		nameEl.className = "node-name";
@@ -1425,7 +1432,7 @@ async function connectSession(idOverride = null, secretOverride = null) {
 	sessionStorage.setItem(SESSION_STORAGE.secret, secret);
 
 	document.body.classList.add("session-loading");
-	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Opening workspace...";
+	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Entering Cloud...";
 	setStatus("Connecting privately...", "warning");
 	state.openTabs.clear();
 	state.currentFileId = "";
@@ -1444,7 +1451,7 @@ async function connectSession(idOverride = null, secretOverride = null) {
 		showToast("Workspace connected.", "success");
 	}
 	document.body.classList.remove("session-loading");
-	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Enter workspace";
+	if (refs.gateConnectButton) refs.gateConnectButton.textContent = "Enter Cloud";
 }
 
 function disconnectSession() {
@@ -1913,10 +1920,23 @@ function renderProjectSearchResults(results) {
 function updateSettingsPreview() {
 	if (!refs.settingsPreview) return;
 	const themeName = refs.editorThemeInput.value || state.settings.editorTheme || DEFAULT_SETTINGS.editorTheme;
+	const fontSize = Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize;
+	const autosave = Number(refs.autosaveInput.value) || DEFAULT_SETTINGS.autosaveMs;
+	const minimapOn = !!refs.minimapInput.checked;
+	const wrapOn = refs.wordWrapInput.value === "on";
+
 	refs.settingsPreview.dataset.theme = themeName;
 	refs.settingsPreview.style.fontFamily = refs.fontFamilyInput.value || DEFAULT_SETTINGS.fontFamily;
-	refs.settingsPreview.style.fontSize = (Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize) + "px";
-	refs.settingsPreviewMeta.textContent = "Lua · " + (Number(refs.fontSizeInput.value) || DEFAULT_SETTINGS.fontSize) + "px · " + (Number(refs.autosaveInput.value) || DEFAULT_SETTINGS.autosaveMs) + "ms";
+	refs.settingsPreview.style.fontSize = fontSize + "px";
+	refs.settingsPreviewMeta.textContent = "Lua · " + fontSize + "px · " + autosave + "ms";
+
+	if (refs.previewMinimap) refs.previewMinimap.classList.toggle("off", !minimapOn);
+	if (refs.previewMinimapBadge) refs.previewMinimapBadge.textContent = minimapOn ? "Minimap on" : "Minimap off";
+	if (refs.previewWrapBadge) refs.previewWrapBadge.textContent = wrapOn ? "Wrap on" : "Wrap off";
+
+	document.querySelectorAll("[data-theme-preset]").forEach(button => {
+		button.classList.toggle("active", button.dataset.themePreset === themeName);
+	});
 }
 
 function openBetaWarning(onContinue) {
@@ -2031,6 +2051,12 @@ function bindEvents() {
 		input.addEventListener("input", updateSettingsPreview);
 		input.addEventListener("change", updateSettingsPreview);
 	}
+	document.querySelectorAll("[data-theme-preset]").forEach(button => {
+		button.addEventListener("click", () => {
+			refs.editorThemeInput.value = button.dataset.themePreset || "cloud-dark";
+			updateSettingsPreview();
+		});
+	});
 	refs.searchInput.addEventListener("input", renderTree);
 	refs.editorShell.addEventListener("dragover", event => {
 		const sourceId = state.draggingTabId || event.dataTransfer.getData("text/cloud-tab");
@@ -2099,6 +2125,13 @@ function bindEvents() {
 	if (refs.betaContinueButton) refs.betaContinueButton.addEventListener("click", closeBetaWarning);
 
 	window.addEventListener("keydown", event => {
+		if (event.key === "F2" && !isInputLike(event.target)) {
+			event.preventDefault();
+			event.stopPropagation();
+			if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+			startRenameSelected();
+			return;
+		}
 		handleGlobalShortcut(event);
 	}, true);
 
@@ -2172,6 +2205,7 @@ function bootEditor() {
 			if (fileId) closeTab(fileId);
 		},
 		onCreate: () => openCreatePanel(getBestCreationParent(), "Script"),
+		onRename: startRenameSelected,
 		onProjectSearch: openProjectSearch,
 		onFoldAll: foldActiveScript,
 		onUnfoldAll: unfoldActiveScript,
