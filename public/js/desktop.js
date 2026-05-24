@@ -41,10 +41,10 @@ function setBadgeText(text) {
 	if (badge) badge.textContent = text;
 }
 
-hideDesktopDownloadButton();
-
 (async function bootDesktopIntegration() {
 	if (!window.forgeDesktop) return;
+
+	hideDesktopDownloadButton();
 
 	try {
 		const info = await window.forgeDesktop.getAppInfo();
